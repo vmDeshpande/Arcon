@@ -1,5 +1,6 @@
 import type { AiClient, ChatMessage } from "@arcon/shared";
 export * from "./prompt-builder.js";
+export * from "./chat-service.js";
 
 export interface OllamaClientOptions {
   baseUrl: string;
