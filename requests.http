@@ -1,0 +1,30 @@
+### Health
+GET http://localhost:3000/health
+
+###
+
+POST http://localhost:3000/chat
+Content-Type: application/json
+
+{
+  "message": "Hello"
+}
+
+###
+
+POST http://localhost:3000/chat
+Content-Type: application/json
+
+{
+  "message": "My favorite language is TypeScript"
+}
+
+###
+
+POST http://localhost:3000/chat
+Content-Type: application/json
+
+{
+  "conversationId": "74bd4ec2-cea2-4df1-b9ad-c5a878dba57d",
+  "message": "What is my favorite language?"
+}

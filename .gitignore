@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.log
+data/logs/*
+data/memories/*.sqlite
+data/memories/*.sqlite-shm
+data/memories/*.sqlite-wal
+!data/logs/.gitkeep
+!data/memories/.gitkeep
