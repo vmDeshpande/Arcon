@@ -8,3 +8,9 @@ data/memories/*.sqlite-shm
 data/memories/*.sqlite-wal
 !data/logs/.gitkeep
 !data/memories/.gitkeep
+
+# Test databases
+packages/memory/.tmp-tests/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
