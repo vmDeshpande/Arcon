@@ -1,5 +1,5 @@
 import type { PersonalityProfile } from "./personality-profile.js";
-import { MoodEngine } from "./mood-engine.js";
+import { MoodEngine } from "../mood/mood-engine.js";
 
 export class PersonalityManager {
   constructor(

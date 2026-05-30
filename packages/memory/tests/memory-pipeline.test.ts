@@ -61,6 +61,41 @@ describe("MemoryPipeline", () => {
     assert.strictEqual(result.ignored, 1);
   });
 
+  it("normalizes relationship synonyms before storing duplicates", () => {
+    const first = pipeline.processCandidates([
+      {
+        type: MemoryType.RELATIONSHIP,
+        content: "User's father is Milind",
+        confidenceScore: 0.95,
+        importanceScore: 8,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+    ]);
+
+    const second = pipeline.processCandidates([
+      {
+        type: MemoryType.RELATIONSHIP,
+        content: "User's dad is Milind",
+        confidenceScore: 0.95,
+        importanceScore: 8,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+    ]);
+
+    assert.strictEqual(first.created, 1);
+    assert.strictEqual(second.created, 0);
+    assert.strictEqual(second.ignored, 1);
+
+    const relationships = repository.listMemories({
+      type: MemoryType.RELATIONSHIP,
+    });
+
+    assert.strictEqual(relationships.length, 1);
+    assert.strictEqual(relationships[0].content, "User's father is Milind");
+  });
+
   it("reinforces an existing memory", () => {
     repository.createMemory({
       type: MemoryType.PREFERENCE,

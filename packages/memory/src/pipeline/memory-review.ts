@@ -1,6 +1,7 @@
 import { MemoryType } from "../personal-memory.js";
 import type { Memory } from "../personal-memory.js";
 import type { MemoryCandidate } from "../extractor/candidate.js";
+import { normalizeRelationshipContent } from "../entity/entity-relationship-extractor.js";
 
 export type MemoryReviewDecision = "CREATE" | "UPDATE" | "IGNORE" | "CONFLICT";
 
@@ -168,7 +169,7 @@ function extractPreferenceDetails(content: string) {
 }
 
 function normalizeContent(content: string): string {
-  return content.trim().toLowerCase().replace(/\s+/g, " ");
+  return normalizeRelationshipContent(content).trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function tokenize(content: string): string[] {

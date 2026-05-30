@@ -1,6 +1,8 @@
 import type { AiClient, ChatMessage } from "@arcon/shared";
 export * from "./prompt-builder.js";
 export * from "./chat-service.js";
+export * from "./context/intent-classifier.js";
+export * from "./reasoning/index.js";
 
 export interface OllamaClientOptions {
   baseUrl: string;
@@ -26,20 +28,22 @@ export class OllamaClient implements AiClient {
     const response = await fetch(`${this.baseUrl}/api/chat`, {
       method: "POST",
       headers: {
-        "content-type": "application/json"
+        "content-type": "application/json",
       },
       body: JSON.stringify({
         model: this.options.model,
         stream: false,
         messages: messages.map((message) => ({
           role: message.role,
-          content: message.content
-        }))
-      })
+          content: message.content,
+        })),
+      }),
     });
 
     if (!response.ok) {
-      throw new Error(`Ollama request failed with status ${response.status}`);
+      const text = await response.text();
+
+      throw new Error(`Ollama request failed (${response.status}): ${text}`);
     }
 
     const data = (await response.json()) as OllamaChatResponse;

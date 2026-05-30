@@ -9,3 +9,8 @@ export * from "./retrieval/memory-ranking.js";
 export * from "./pipeline/memory-pipeline.js";
 export * from "./pipeline/memory-review.js";
 export * from "./pipeline/memory-result.js";
+
+export * from "./semantic/index.js";
+export * from "./entity/index.js";
+
+export * from "./conversation/index.js";

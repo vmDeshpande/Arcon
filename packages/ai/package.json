@@ -11,7 +11,9 @@
     "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
-    "@arcon/shared": "0.1.0"
+    "@arcon/shared": "*",
+    "@arcon/memory": "*",
+    "@arcon/personality": "*"
   },
   "devDependencies": {
     "typescript": "^5.5.4"

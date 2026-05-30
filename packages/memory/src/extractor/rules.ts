@@ -11,7 +11,7 @@ export interface ExtractionRuleConfig {
 
 export const DEFAULT_RULE_CONFIG: ExtractionRuleConfig = {
   minMessageLength: 10,
-  maxMessageLength: 5000
+  maxMessageLength: 5000,
 };
 
 /**
@@ -33,7 +33,7 @@ export class ExtractionRules {
 
     // Pattern: "My favorite X is Y"
     const favoriteMatch = message.match(
-      /my\s+favorite\s+(\w+)\s+(?:is|are)\s+(.+?)(?:\.|$)/i
+      /my\s+favorite\s+(\w+)\s+(?:is|are)\s+(.+?)(?:\.|$)/i,
     );
     if (favoriteMatch) {
       candidates.push({
@@ -42,7 +42,7 @@ export class ExtractionRules {
         confidenceScore: 0.95,
         importanceScore: 6,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit favorite statement"
+        reasoning: "Explicit favorite statement",
       });
     }
 
@@ -55,7 +55,7 @@ export class ExtractionRules {
         confidenceScore: 0.9,
         importanceScore: 6,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit preference statement"
+        reasoning: "Explicit preference statement",
       });
     }
 
@@ -68,13 +68,13 @@ export class ExtractionRules {
         confidenceScore: 0.85,
         importanceScore: 6,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Like statement indicating preference"
+        reasoning: "Like statement indicating preference",
       });
     }
 
     // Pattern: "I don't like X" / "I dislike X"
     const dislikeMatch = message.match(
-      /i\s+(?:don't\s+like|dislike)\s+(.+?)(?:\.|$)/i
+      /i\s+(?:don't\s+like|dislike)\s+(.+?)(?:\.|$)/i,
     );
     if (dislikeMatch) {
       candidates.push({
@@ -83,7 +83,7 @@ export class ExtractionRules {
         confidenceScore: 0.9,
         importanceScore: 6,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit dislike statement"
+        reasoning: "Explicit dislike statement",
       });
     }
 
@@ -100,8 +100,38 @@ export class ExtractionRules {
     // Check if this message is about projects "I am/I'm building/working ON/creating/developing"
     // Note: "working on" is different from "work with"
     const isProject = message.match(
-      /i(?:\s+am|\s*'m)?\s+(?:(?:currently\s+)?(?:building|working\s+on|creating|developing))/i
+      /i(?:\s+am|\s*'m)?\s+(?:(?:currently\s+)?(?:building|working\s+on|creating|developing))/i,
     );
+
+    // Pattern: "My name is X"
+    const nameMatch = message.match(
+      /my\s+name\s+is\s+([a-zA-Z\s'-]+)(?:\.|$)/i,
+    );
+    if (nameMatch) {
+      candidates.push({
+        type: MemoryType.FACT,
+        content: `User's name is ${nameMatch[1].trim()}`,
+        confidenceScore: 1,
+        importanceScore: 10,
+        sourceType: MemorySourceType.USER_EXPLICIT,
+        reasoning: "User explicitly stated their name",
+      });
+    }
+
+    const familyMatch = message.match(
+      /my\s+(sister|brother|mother|father|mom|dad)\s*'?s?\s+name\s+is\s+(.+?)(?:\.|$)/i,
+    );
+
+    if (familyMatch) {
+      candidates.push({
+        type: MemoryType.RELATIONSHIP,
+        content: `User's ${familyMatch[1].trim()} is ${familyMatch[2].trim()}`,
+        confidenceScore: 0.95,
+        importanceScore: 7,
+        sourceType: MemorySourceType.USER_EXPLICIT,
+        reasoning: "Family relationship statement",
+      });
+    }
 
     // Pattern: "I use X"
     const useMatch = message.match(/i\s+use\s+(.+?)(?:\.|$)/i);
@@ -112,7 +142,7 @@ export class ExtractionRules {
         confidenceScore: 0.9,
         importanceScore: 5,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "User explicitly states they use something"
+        reasoning: "User explicitly states they use something",
       });
     }
 
@@ -125,20 +155,20 @@ export class ExtractionRules {
         confidenceScore: 0.9,
         importanceScore: 5,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "User explicitly states they work with something"
+        reasoning: "User explicitly states they work with something",
       });
     }
 
     // Pattern: "I am X" (profession, status) - but NOT if it's a project statement
     if (!isProject) {
-      const amMatch = message.match(
-        /i\s+am\s+(?:a\s+)?([^.,!?]*?)(?:\.|$)/i
-      );
+      const amMatch = message.match(/i\s+am\s+(?:a\s+)?([^.,!?]*?)(?:\.|$)/i);
       if (amMatch && !useMatch) {
         const candidate = amMatch[1].trim().toLowerCase();
         // Filter out ambiguous or overly general statements
         if (
-          !["here", "ready", "sorry", "confused", "not sure"].includes(candidate)
+          !["here", "ready", "sorry", "confused", "not sure"].includes(
+            candidate,
+          )
         ) {
           candidates.push({
             type: MemoryType.FACT,
@@ -146,7 +176,7 @@ export class ExtractionRules {
             confidenceScore: 0.85,
             importanceScore: 5,
             sourceType: MemorySourceType.USER_EXPLICIT,
-            reasoning: "User states a fact about themselves"
+            reasoning: "User states a fact about themselves",
           });
         }
       }
@@ -161,7 +191,7 @@ export class ExtractionRules {
         confidenceScore: 0.85,
         importanceScore: 5,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "User explicitly states they have something"
+        reasoning: "User explicitly states they have something",
       });
     }
 
@@ -177,7 +207,7 @@ export class ExtractionRules {
 
     // Pattern: "I am building X" / "I'm building X"
     const buildMatch = message.match(
-      /i(?:\s+am|\s*'m)?\s+(?:currently\s+)?building\s+(.+?)(?:\.|$)/i
+      /i(?:\s+am|\s*'m)?\s+(?:currently\s+)?building\s+(.+?)(?:\.|$)/i,
     );
     if (buildMatch) {
       candidates.push({
@@ -186,13 +216,13 @@ export class ExtractionRules {
         confidenceScore: 0.95,
         importanceScore: 8,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit statement about current project"
+        reasoning: "Explicit statement about current project",
       });
     }
 
     // Pattern: "I am working on X" / "I'm working on X"
     const workingMatch = message.match(
-      /i(?:\s+am|\s*'m)?\s+(?:currently\s+)?working\s+on\s+(.+?)(?:\.|$)/i
+      /i(?:\s+am|\s*'m)?\s+(?:currently\s+)?working\s+on\s+(.+?)(?:\.|$)/i,
     );
     if (workingMatch && !buildMatch) {
       candidates.push({
@@ -201,13 +231,13 @@ export class ExtractionRules {
         confidenceScore: 0.95,
         importanceScore: 8,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit statement about current work"
+        reasoning: "Explicit statement about current work",
       });
     }
 
     // Pattern: "I am creating X"
     const creatingMatch = message.match(
-      /i(?:\s+am|\s*'m)?\s+(?:currently\s+)?creating\s+(.+?)(?:\.|$)/i
+      /i(?:\s+am|\s*'m)?\s+(?:currently\s+)?creating\s+(.+?)(?:\.|$)/i,
     );
     if (creatingMatch && !buildMatch && !workingMatch) {
       candidates.push({
@@ -216,13 +246,13 @@ export class ExtractionRules {
         confidenceScore: 0.95,
         importanceScore: 8,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit statement about project creation"
+        reasoning: "Explicit statement about project creation",
       });
     }
 
     // Pattern: "I am developing X"
     const developingMatch = message.match(
-      /i(?:\s+am|\s*'m)?\s+(?:currently\s+)?developing\s+(.+?)(?:\.|$)/i
+      /i(?:\s+am|\s*'m)?\s+(?:currently\s+)?developing\s+(.+?)(?:\.|$)/i,
     );
     if (developingMatch && !buildMatch && !workingMatch && !creatingMatch) {
       candidates.push({
@@ -231,7 +261,7 @@ export class ExtractionRules {
         confidenceScore: 0.95,
         importanceScore: 8,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit statement about project development"
+        reasoning: "Explicit statement about project development",
       });
     }
 
@@ -254,14 +284,12 @@ export class ExtractionRules {
         confidenceScore: 0.95,
         importanceScore: 8,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit goal statement"
+        reasoning: "Explicit goal statement",
       });
     }
 
     // Pattern: "I want to X"
-    const wantMatch = message.match(
-      /i\s+want\s+(?:to|for)\s+(.+?)(?:\.|$)/i
-    );
+    const wantMatch = message.match(/i\s+want\s+(?:to|for)\s+(.+?)(?:\.|$)/i);
     if (wantMatch && !goalMatch) {
       candidates.push({
         type: MemoryType.GOAL,
@@ -269,7 +297,7 @@ export class ExtractionRules {
         confidenceScore: 0.8,
         importanceScore: 8,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Want statement indicating a goal"
+        reasoning: "Want statement indicating a goal",
       });
     }
 
@@ -282,13 +310,13 @@ export class ExtractionRules {
         confidenceScore: 0.9,
         importanceScore: 8,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Aim statement indicating a goal"
+        reasoning: "Aim statement indicating a goal",
       });
     }
 
     // Pattern: "I need to X" / "I should X"
     const needMatch = message.match(
-      /i\s+(?:need|should)\s+(?:to\s+)?(.+?)(?:\.|$)/i
+      /i\s+(?:need|should)\s+(?:to\s+)?(.+?)(?:\.|$)/i,
     );
     if (needMatch && !goalMatch && !wantMatch && !aimMatch) {
       candidates.push({
@@ -297,7 +325,7 @@ export class ExtractionRules {
         confidenceScore: 0.75,
         importanceScore: 8,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Need/should statement indicating a goal"
+        reasoning: "Need/should statement indicating a goal",
       });
     }
 
@@ -320,13 +348,13 @@ export class ExtractionRules {
         confidenceScore: 0.95,
         importanceScore: 9,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit constraint with must"
+        reasoning: "Explicit constraint with must",
       });
     }
 
     // Pattern: "X can't Y" / "X cannot Y"
     const cantMatch = message.match(
-      /(\w+[\w\s]*?)\s+(?:can't|cannot)\s+(.+?)(?:\.|$)/i
+      /(\w+[\w\s]*?)\s+(?:can't|cannot)\s+(.+?)(?:\.|$)/i,
     );
     if (cantMatch && !mustMatch) {
       candidates.push({
@@ -335,13 +363,13 @@ export class ExtractionRules {
         confidenceScore: 0.95,
         importanceScore: 9,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit constraint with cannot"
+        reasoning: "Explicit constraint with cannot",
       });
     }
 
     // Pattern: "X should only Y"
     const shouldOnlyMatch = message.match(
-      /(\w+[\w\s]*?)\s+should\s+only\s+(.+?)(?:\.|$)/i
+      /(\w+[\w\s]*?)\s+should\s+only\s+(.+?)(?:\.|$)/i,
     );
     if (shouldOnlyMatch) {
       candidates.push({
@@ -350,7 +378,7 @@ export class ExtractionRules {
         confidenceScore: 0.9,
         importanceScore: 9,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit constraint with should only"
+        reasoning: "Explicit constraint with should only",
       });
     }
 
@@ -366,7 +394,7 @@ export class ExtractionRules {
 
     // Pattern: "X works with me" or "X works with arcon"
     const worksWithMatch = message.match(
-      /(\w+[\w\s]*?)\s+(?:works|is\s+working)\s+with\s+(me|arcon|my\s+\w+)/i
+      /(\w+[\w\s]*?)\s+(?:works|is\s+working)\s+with\s+(me|arcon|my\s+\w+)/i,
     );
     if (worksWithMatch) {
       candidates.push({
@@ -375,13 +403,13 @@ export class ExtractionRules {
         confidenceScore: 0.9,
         importanceScore: 7,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit statement about working relationship"
+        reasoning: "Explicit statement about working relationship",
       });
     }
 
     // Pattern: "X wants to contribute to"
     const contributeMatch = message.match(
-      /(\w+[\w\s]*?)\s+wants?\s+to\s+contribute\s+to\s+(.+?)(?:\.|$)/i
+      /(\w+[\w\s]*?)\s+wants?\s+to\s+contribute\s+to\s+(.+?)(?:\.|$)/i,
     );
     if (contributeMatch) {
       candidates.push({
@@ -390,13 +418,13 @@ export class ExtractionRules {
         confidenceScore: 0.9,
         importanceScore: 7,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit statement about collaborative relationship"
+        reasoning: "Explicit statement about collaborative relationship",
       });
     }
 
     // Pattern: "X and I" with collaboration implied
     const andIMatch = message.match(
-      /(\w+[\w\s]*?)\s+and\s+i\s+(?:are|are\s+both|both)\s+(.+?)(?:\.|$)/i
+      /(\w+[\w\s]*?)\s+and\s+i\s+(?:are|are\s+both|both)\s+(.+?)(?:\.|$)/i,
     );
     if (andIMatch) {
       candidates.push({
@@ -405,13 +433,13 @@ export class ExtractionRules {
         confidenceScore: 0.8,
         importanceScore: 7,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Relationship identified through joint action"
+        reasoning: "Relationship identified through joint action",
       });
     }
 
     // Pattern: "X is my [role]"
     const myRoleMatch = message.match(
-      /(\w+[\w\s]*?)\s+is\s+my\s+(\w+)(?:\.|$)/i
+      /(\w+[\w\s]*?)\s+is\s+my\s+(\w+)(?:\.|$)/i,
     );
     if (myRoleMatch) {
       candidates.push({
@@ -420,7 +448,7 @@ export class ExtractionRules {
         confidenceScore: 0.95,
         importanceScore: 7,
         sourceType: MemorySourceType.USER_EXPLICIT,
-        reasoning: "Explicit relationship role statement"
+        reasoning: "Explicit relationship role statement",
       });
     }
 
@@ -443,19 +471,19 @@ export class ExtractionRules {
 
     if (message.trim().length < this.config.minMessageLength) {
       errors.push(
-        `Message too short (${message.trim().length} < ${this.config.minMessageLength})`
+        `Message too short (${message.trim().length} < ${this.config.minMessageLength})`,
       );
     }
 
     if (message.length > this.config.maxMessageLength) {
       errors.push(
-        `Message too long (${message.length} > ${this.config.maxMessageLength})`
+        `Message too long (${message.length} > ${this.config.maxMessageLength})`,
       );
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 }

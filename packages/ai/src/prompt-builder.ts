@@ -10,17 +10,23 @@ export class PromptBuilder {
     return [
       "SYSTEM:",
       input.systemPrompt,
+
       "",
+
       "MEMORIES:",
       input.memoryContext || "No relevant memories.",
+
       "",
+
       "CONVERSATION:",
       input.conversationHistory.length > 0
         ? input.conversationHistory.join("\n")
         : "No previous conversation.",
+
       "",
+
       "USER:",
-      input.userMessage
+      input.userMessage,
     ].join("\n");
   }
 }
