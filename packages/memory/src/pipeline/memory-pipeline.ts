@@ -9,7 +9,11 @@ import type { MemoryCandidate } from "../extractor/candidate.js";
 import type { PipelineResult } from "./memory-result.js";
 import { reviewCandidate } from "./memory-review.js";
 import type { ExtractionRuleConfig } from "../extractor/rules.js";
-import { normalizeRelationshipContent } from "../entity/entity-relationship-extractor.js";
+import {
+  isBlockedUserIdentityName,
+  normalizeRelationshipContent,
+} from "../entity/entity-relationship-extractor.js";
+import { isRedundantEntityOnlyMemory } from "../semantic/memory-quality.js";
 
 const DEFAULT_MIN_CONFIDENCE = 0.7;
 
@@ -258,9 +262,10 @@ export class MemoryPipeline {
   private normalizeCandidates(
     candidates: MemoryCandidate[],
   ): MemoryCandidate[] {
-    const normalizedCandidates = candidates.map((candidate) =>
-      this.normalizeCandidate(candidate),
-    );
+    const normalizedCandidates = candidates.flatMap((candidate) => {
+      const normalized = this.normalizeCandidate(candidate);
+      return normalized ? [normalized] : [];
+    });
     const seen = new Set<string>();
     const unique: MemoryCandidate[] = [];
 
@@ -278,17 +283,31 @@ export class MemoryPipeline {
     return unique;
   }
 
-  private normalizeCandidate(candidate: MemoryCandidate): MemoryCandidate {
+  private normalizeCandidate(candidate: MemoryCandidate): MemoryCandidate | null {
+    const trimmedContent = candidate.content.trim();
+
+    if (isRedundantEntityOnlyMemory(trimmedContent)) {
+      return null;
+    }
+
     if (candidate.type !== MemoryType.RELATIONSHIP) {
       return {
         ...candidate,
-        content: candidate.content.trim(),
+        content: trimmedContent,
       };
+    }
+
+    const content = normalizeRelationshipContent(trimmedContent);
+    const selfMatch = content.match(/^User's self is ([a-z][a-zA-Z]*)$/i);
+
+    if (selfMatch && isBlockedUserIdentityName(selfMatch[1])) {
+      return null;
     }
 
     return {
       ...candidate,
-      content: normalizeRelationshipContent(candidate.content),
+      content,
     };
   }
+
 }

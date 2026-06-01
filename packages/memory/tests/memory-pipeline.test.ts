@@ -96,6 +96,139 @@ describe("MemoryPipeline", () => {
     assert.strictEqual(relationships[0].content, "User's father is Milind");
   });
 
+  it("drops blocked self-identity action relationships before storage", () => {
+    const result = pipeline.processCandidates([
+      {
+        type: MemoryType.RELATIONSHIP,
+        content: "User's self is building",
+        confidenceScore: 0.95,
+        importanceScore: 8,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+    ]);
+
+    assert.strictEqual(result.created, 0);
+
+    const relationships = repository.listMemories({
+      type: MemoryType.RELATIONSHIP,
+    });
+
+    assert.strictEqual(relationships.length, 0);
+  });
+
+  it("drops redundant identity fact memories before storage", () => {
+    const result = pipeline.processCandidates([
+      {
+        type: MemoryType.FACT,
+        content: "Vedant's name is Vedant",
+        confidenceScore: 0.95,
+        importanceScore: 5,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+      {
+        type: MemoryType.FACT,
+        content: "Madhura's name is Madhura",
+        confidenceScore: 0.95,
+        importanceScore: 5,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+      {
+        type: MemoryType.FACT,
+        content: "Arcon is Arcon",
+        confidenceScore: 0.95,
+        importanceScore: 5,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+    ]);
+
+    assert.strictEqual(result.created, 0);
+    assert.strictEqual(repository.listMemories().length, 0);
+  });
+
+  it("drops standalone entity declaration memories before storage", () => {
+    const result = pipeline.processCandidates([
+      {
+        type: MemoryType.PROJECT,
+        content: "Arcon",
+        confidenceScore: 0.95,
+        importanceScore: 5,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+      {
+        type: MemoryType.PROJECT,
+        content: "PROJECT: Arcon",
+        confidenceScore: 0.95,
+        importanceScore: 5,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+      {
+        type: MemoryType.FACT,
+        content: "Entity: Arcon",
+        confidenceScore: 0.95,
+        importanceScore: 5,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+    ]);
+
+    assert.strictEqual(result.created, 0);
+    assert.strictEqual(repository.listMemories().length, 0);
+  });
+
+  it("keeps meaningful identity, family, and project memories", () => {
+    const result = pipeline.processCandidates([
+      {
+        type: MemoryType.RELATIONSHIP,
+        content: "User's self is Vedant",
+        confidenceScore: 0.95,
+        importanceScore: 8,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+      {
+        type: MemoryType.RELATIONSHIP,
+        content: "User's sister is Madhura",
+        confidenceScore: 0.95,
+        importanceScore: 8,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+      {
+        type: MemoryType.RELATIONSHIP,
+        content: "User's building is Arcon",
+        confidenceScore: 0.95,
+        importanceScore: 8,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+      {
+        type: MemoryType.FACT,
+        content: "Arcon is being built",
+        confidenceScore: 0.95,
+        importanceScore: 7,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+    ]);
+
+    assert.strictEqual(result.created, 4);
+    assert.deepStrictEqual(
+      repository.listMemories().map((memory) => memory.content).sort(),
+      [
+        "Arcon is being built",
+        "User's building is Arcon",
+        "User's self is Vedant",
+        "User's sister is Madhura",
+      ].sort(),
+    );
+  });
+
   it("reinforces an existing memory", () => {
     repository.createMemory({
       type: MemoryType.PREFERENCE,

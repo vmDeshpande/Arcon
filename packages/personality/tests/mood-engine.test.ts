@@ -1,39 +1,80 @@
 import { describe, it } from "node:test";
-import assert from "node:assert";
+import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { MoodEngine } from "../src/mood-engine.js";
+import {
+  MoodEngine,
+  MoodRepository,
+} from "../src/mood/index.js";
+
+function createMoodEngine() {
+  const dir = mkdtempSync(join(tmpdir(), "arcon-mood-"));
+  const repository = new MoodRepository(join(dir, "mood.sqlite"));
+  return {
+    engine: new MoodEngine(repository),
+    repository,
+  };
+}
 
 describe("MoodEngine", () => {
-  it("starts neutral", () => {
-    const mood = new MoodEngine();
+  it("starts with neutral behavior state", () => {
+    const { engine, repository } = createMoodEngine();
 
-    assert.strictEqual(
-      mood.getMood(),
-      "neutral"
-    );
+    assert.equal(engine.getMood().frustration, 0);
+    assert.equal(engine.getMood().askCount, 0);
+    assert.equal(engine.getMood().pendingQuestion, false);
+
+    repository.close();
   });
 
-  it("changes mood", () => {
-    const mood = new MoodEngine();
+  it("accumulates frustration when assistant questions are ignored", () => {
+    const { engine, repository } = createMoodEngine();
 
-    mood.setMood("focused");
+    for (let index = 0; index < 3; index += 1) {
+      engine.recordAssistantReply("What hobbies do you enjoy?");
+      engine.recordUserTurn("My dog likes pedigree");
+    }
 
-    assert.strictEqual(
-      mood.getMood(),
-      "focused"
-    );
+    assert.equal(engine.getMood().frustration, 3);
+
+    repository.close();
   });
 
-  it("resets mood", () => {
-    const mood = new MoodEngine();
+  it("decays frustration and ask count after positive engagement", () => {
+    const { engine, repository } = createMoodEngine();
 
-    mood.setMood("excited");
+    for (let index = 0; index < 3; index += 1) {
+      engine.recordAssistantReply("What hobbies do you enjoy?");
+      engine.recordUserTurn("My dog likes pedigree");
+    }
 
-    mood.reset();
+    engine.recordAssistantReply("What do you like doing?");
+    engine.recordUserTurn("I like building small tools");
 
-    assert.strictEqual(
-      mood.getMood(),
-      "neutral"
-    );
+    assert.equal(engine.getMood().frustration, 2);
+    assert.equal(engine.getMood().askCount, 3);
+
+    repository.close();
+  });
+
+  it("persists behavior state across repository instances", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arcon-mood-"));
+    const path = join(dir, "mood.sqlite");
+    const firstRepository = new MoodRepository(path);
+    const firstEngine = new MoodEngine(firstRepository);
+
+    firstEngine.recordAssistantReply("What hobbies do you enjoy?");
+    firstEngine.recordUserTurn("My dog likes pedigree");
+    firstRepository.close();
+
+    const secondRepository = new MoodRepository(path);
+    const secondEngine = new MoodEngine(secondRepository);
+
+    assert.equal(secondEngine.getMood().frustration, 1);
+    assert.equal(secondEngine.getMood().askCount, 1);
+
+    secondRepository.close();
   });
 });

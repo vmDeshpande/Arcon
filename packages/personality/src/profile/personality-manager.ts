@@ -12,10 +12,16 @@ export class PersonalityManager {
   }
 
   getSystemPrompt(): string {
+    const mood = this.moodEngine.getMood();
+
     return `
 You are ${this.profile.name}.
 
-Current mood: ${this.moodEngine.getMood()}.
+Current mood:
+- Curiosity: ${mood.curiosity}
+- Frustration Level: ${mood.frustration}
+- Ask Count: ${mood.askCount}
+- Pending Question: ${mood.pendingQuestion ? "yes" : "no"}
 
 Core traits:
 - Curiosity: ${this.profile.traits.curiosity}

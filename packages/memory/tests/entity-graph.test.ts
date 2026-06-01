@@ -171,6 +171,89 @@ test("relationship graph creates building project relationship", () => {
   repository.close();
 });
 
+test("final graph for identity and project excludes action-word user entities", () => {
+  const repository = createRepository();
+  const factRepository = new EntityFactRepository(repository.getDatabase());
+  const linker = new EntityMemoryLinker(repository);
+  const builder = new EntityKnowledgeBuilder(repository, factRepository);
+  const memories = [
+    memory("User's self is Vedant", "RELATIONSHIP"),
+    memory("User's building is Arcon", "RELATIONSHIP"),
+    memory("Arcon is being built", "FACT"),
+    memory("User's self is building", "RELATIONSHIP"),
+  ];
+
+  linker.link(memories);
+  builder.build(memories);
+
+  const user = repository.findByName("User");
+  const entities = repository.listEntities();
+
+  assert.deepEqual(
+    entities.map((entity) => [entity.name, entity.type]).sort(),
+    [
+      ["Arcon", "PROJECT"],
+      ["User", "USER"],
+      ["Vedant", "USER"],
+    ].sort(),
+  );
+  assert.equal(repository.resolveRelationship(user!.id, "self")?.name, "Vedant");
+  assert.equal(
+    repository.resolveRelationship(user!.id, "building")?.name,
+    "Arcon",
+  );
+  assert.equal(repository.findByName("building"), null);
+  assert.deepEqual(
+    factRepository
+      .getFacts(repository.findByName("Arcon")!.id)
+      .map((fact) => fact.fact),
+    ["is being built"],
+  );
+
+  repository.close();
+});
+
+test("knowledge builder ignores redundant entity-only facts", () => {
+  const repository = createRepository();
+  const factRepository = new EntityFactRepository(repository.getDatabase());
+  const builder = new EntityKnowledgeBuilder(repository, factRepository);
+
+  builder.build([
+    memory("Vedant's name is Vedant", "FACT"),
+    memory("Madhura's name is Madhura", "FACT"),
+    memory("Arcon is Arcon", "FACT"),
+    memory("Arcon", "PROJECT"),
+    memory("PROJECT: Arcon", "PROJECT"),
+    memory("Entity: Arcon", "FACT"),
+  ]);
+
+  assert.deepEqual(repository.listEntities(), []);
+  assert.deepEqual(factRepository.listFacts(), []);
+
+  repository.close();
+});
+
+test("project action words are never created as user entities", () => {
+  for (const action of [
+    "building",
+    "creating",
+    "developing",
+    "making",
+    "working",
+    "coding",
+    "designing",
+  ]) {
+    const repository = createRepository();
+    const linker = new EntityMemoryLinker(repository);
+
+    linker.link([memory(`User's self is ${action}`, "RELATIONSHIP")]);
+
+    assert.equal(repository.findByName(action), null);
+
+    repository.close();
+  }
+});
+
 test("entity-centric retrieval resolves relationship target facts", () => {
   const entityRepository = createRepository();
   const memoryRepository = createMemoryRepository();

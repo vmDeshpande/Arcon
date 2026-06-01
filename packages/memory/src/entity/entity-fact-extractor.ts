@@ -1,4 +1,5 @@
 import type { SemanticMemory } from "../semantic/semantic-types.js";
+import { isRedundantEntityOnlyMemory } from "../semantic/memory-quality.js";
 import type { EntityType } from "./entity.js";
 import { EntityRelationshipExtractor } from "./entity-relationship-extractor.js";
 
@@ -21,6 +22,10 @@ export class EntityFactExtractor {
 
     for (const memory of memories) {
       const content = memory.content.trim();
+
+      if (isRedundantEntityOnlyMemory(content)) {
+        continue;
+      }
 
       if (this.relationshipExtractor.extract(content)) {
         continue;

@@ -10,6 +10,8 @@ import {
 interface MoodRow {
   curiosity: number;
   frustration: number;
+  ask_count?: number;
+  pending_question?: number;
   trust: number;
   excitement: number;
   updated_at: string;
@@ -39,12 +41,24 @@ export class MoodRepository {
 
         curiosity REAL NOT NULL,
         frustration REAL NOT NULL,
+        ask_count INTEGER NOT NULL DEFAULT 0,
+        pending_question INTEGER NOT NULL DEFAULT 0,
         trust REAL NOT NULL,
         excitement REAL NOT NULL,
 
         updated_at TEXT NOT NULL
       );
     `);
+
+    this.ensureColumn(
+      "ask_count",
+      "INTEGER NOT NULL DEFAULT 0",
+    );
+
+    this.ensureColumn(
+      "pending_question",
+      "INTEGER NOT NULL DEFAULT 0",
+    );
 
     const existing =
       this.db
@@ -65,6 +79,8 @@ export class MoodRepository {
             id,
             curiosity,
             frustration,
+            ask_count,
+            pending_question,
             trust,
             excitement,
             updated_at
@@ -73,12 +89,18 @@ export class MoodRepository {
             1,
             @curiosity,
             @frustration,
+            @askCount,
+            @pendingQuestion,
             @trust,
             @excitement,
             @updatedAt
           )
         `)
-        .run(mood);
+        .run({
+          ...mood,
+          pendingQuestion:
+            mood.pendingQuestion ? 1 : 0,
+        });
     }
   }
 
@@ -99,6 +121,10 @@ export class MoodRepository {
         row.curiosity,
       frustration:
         row.frustration,
+      askCount:
+        row.ask_count ?? 0,
+      pendingQuestion:
+        Boolean(row.pending_question ?? 0),
       trust:
         row.trust,
       excitement:
@@ -116,6 +142,8 @@ export class MoodRepository {
         UPDATE mood_state
         SET curiosity = ?,
             frustration = ?,
+            ask_count = ?,
+            pending_question = ?,
             trust = ?,
             excitement = ?,
             updated_at = ?
@@ -124,6 +152,8 @@ export class MoodRepository {
       .run(
         mood.curiosity,
         mood.frustration,
+        mood.askCount,
+        mood.pendingQuestion ? 1 : 0,
         mood.trust,
         mood.excitement,
         mood.updatedAt,
@@ -139,5 +169,22 @@ export class MoodRepository {
 
   close(): void {
     this.db.close();
+  }
+
+  private ensureColumn(
+    name: string,
+    definition: string,
+  ): void {
+    const columns = this.db
+      .prepare("PRAGMA table_info(mood_state)")
+      .all() as Array<{ name: string }>;
+
+    if (columns.some((column) => column.name === name)) {
+      return;
+    }
+
+    this.db.exec(
+      `ALTER TABLE mood_state ADD COLUMN ${name} ${definition}`,
+    );
   }
 }

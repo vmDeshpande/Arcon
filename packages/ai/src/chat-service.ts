@@ -23,6 +23,7 @@ import {
   ExperienceRepository,
   MoodEngine,
   MoodRepository,
+  buildBehaviorPrompt,
 } from "@arcon/personality";
 import { PromptBuilder } from "./prompt-builder.js";
 import { classifyIntent, IntentType } from "./context/intent-classifier.js";
@@ -36,6 +37,12 @@ export interface ChatResult {
   reply: string;
 }
 
+export interface ChatServiceOptions {
+  experienceDatabasePath?: string;
+  moodDatabasePath?: string;
+  entityDatabasePath?: string;
+}
+
 export class ChatService {
   private readonly experiences: ExperienceManager;
   private readonly moodEngine: MoodEngine;
@@ -44,24 +51,32 @@ export class ChatService {
   private readonly factRepository: EntityFactRepository;
   private readonly knowledgeBuilder: EntityKnowledgeBuilder;
   private readonly conversationTracker: ConversationEntityTracker;
+  private readonly moodRepository: MoodRepository;
 
   constructor(
     private readonly repository: MemoryRepository,
     private readonly pipeline: MemoryPipeline,
-    private readonly aiClient: AiClient,
+    private readonly aiClient: AiClient = {
+      async generateReply() {
+        return "";
+      },
+    },
+    options: ChatServiceOptions = {},
   ) {
     const experienceRepository = new ExperienceRepository(
-      "./data/experiences.sqlite",
+      options.experienceDatabasePath ?? "./data/experiences.sqlite",
     );
 
     this.experiences = new ExperienceManager(experienceRepository);
 
-    const moodRepository = new MoodRepository("./data/mood.sqlite");
+    this.moodRepository = new MoodRepository(
+      options.moodDatabasePath ?? "./data/mood.sqlite",
+    );
 
-    this.moodEngine = new MoodEngine(moodRepository);
+    this.moodEngine = new MoodEngine(this.moodRepository);
 
     this.entityRepository = new EntityRepository(
-      "./apps/chat/data/entities.sqlite",
+      options.entityDatabasePath ?? "./apps/chat/data/entities.sqlite",
     );
 
     this.entityLinker = new EntityMemoryLinker(this.entityRepository);
@@ -81,6 +96,8 @@ export class ChatService {
   }
 
   async chat(message: string): Promise<ChatResult> {
+    this.moodEngine.recordUserTurn(message);
+
     const experience = classifyExperience(message);
 
     if (experience === "USER_ASKED_IDENTITY") {
@@ -108,6 +125,8 @@ export class ChatService {
     const relationshipResult = relationshipRecall.handle(message);
 
     if (relationshipResult.handled && relationshipResult.reply) {
+      this.moodEngine.recordAssistantReply(relationshipResult.reply);
+
       return {
         prompt: "",
         reply: relationshipResult.reply,
@@ -115,6 +134,8 @@ export class ChatService {
     }
 
     if (recallResult.handled && recallResult.reply) {
+      this.moodEngine.recordAssistantReply(recallResult.reply);
+
       return {
         prompt: "",
         reply: recallResult.reply,
@@ -203,7 +224,15 @@ export class ChatService {
 
     const relationshipPrompt = buildRelationshipPrompt();
 
-    const systemPrompt = [identityPrompt, "", relationshipPrompt].join("\n");
+    const behaviorPrompt = buildBehaviorPrompt(this.moodEngine.getMood());
+
+    const systemPrompt = [
+      identityPrompt,
+      "",
+      relationshipPrompt,
+      "",
+      behaviorPrompt,
+    ].join("\n");
 
     let memoryContext = "";
 
@@ -247,6 +276,8 @@ export class ChatService {
 
     const reply = await this.aiClient.generateReply(messages);
 
+    this.moodEngine.recordAssistantReply(reply);
+
     return {
       prompt,
       reply,
@@ -255,5 +286,6 @@ export class ChatService {
 
   close(): void {
     this.entityRepository.close();
+    this.moodRepository.close();
   }
 }

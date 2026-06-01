@@ -95,6 +95,50 @@ test("keeps same-message identity preferences on User", async () => {
   );
 });
 
+test("drops redundant self-name facts for identity declarations", async () => {
+  const extractor = new LlmMemoryExtractor(
+    new FakeAiClient(
+      JSON.stringify([
+        {
+          type: "FACT",
+          content: "Vedant's name is Vedant",
+          confidenceScore: 0.95,
+          importanceScore: 5,
+        },
+      ]),
+    ),
+  );
+
+  const memories = await extractor.extract("My name is Vedant");
+
+  assert.deepEqual(
+    memories.map((memory) => [memory.type, memory.content]),
+    [[MemoryType.RELATIONSHIP, "User's self is Vedant"]],
+  );
+});
+
+test("drops redundant self-name facts for family relationship declarations", async () => {
+  const extractor = new LlmMemoryExtractor(
+    new FakeAiClient(
+      JSON.stringify([
+        {
+          type: "FACT",
+          content: "Madhura's name is Madhura",
+          confidenceScore: 0.95,
+          importanceScore: 5,
+        },
+      ]),
+    ),
+  );
+
+  const memories = await extractor.extract("My sister's name is Madhura");
+
+  assert.deepEqual(
+    memories.map((memory) => [memory.type, memory.content]),
+    [[MemoryType.RELATIONSHIP, "User's sister is Madhura"]],
+  );
+});
+
 test("recovers building relationship for project statements", async () => {
   const extractor = new LlmMemoryExtractor(
     new FakeAiClient(
@@ -105,17 +149,60 @@ test("recovers building relationship for project statements", async () => {
           confidenceScore: 0.95,
           importanceScore: 8,
         },
+        {
+          type: "RELATIONSHIP",
+          content: "User's self is building",
+          confidenceScore: 0.8,
+          importanceScore: 8,
+        },
+        {
+          type: "FACT",
+          content: "Arcon is Arcon",
+          confidenceScore: 0.8,
+          importanceScore: 5,
+        },
+        {
+          type: "PROJECT",
+          content: "Arcon",
+          confidenceScore: 0.8,
+          importanceScore: 5,
+        },
       ]),
     ),
   );
 
   const memories = await extractor.extract("I am building Arcon");
 
-  assert(
-    memories.some(
-      (memory) =>
-        memory.type === MemoryType.RELATIONSHIP &&
-        memory.content === "User's building is Arcon",
+  assert.deepEqual(
+    memories.map((memory) => [memory.type, memory.content]),
+    [
+      [MemoryType.RELATIONSHIP, "User's building is Arcon"],
+      [MemoryType.FACT, "Arcon is being built"],
+    ],
+  );
+});
+
+test("recovers developing relationship for project statements", async () => {
+  const extractor = new LlmMemoryExtractor(
+    new FakeAiClient(
+      JSON.stringify([
+        {
+          type: "PROJECT",
+          content: "User is developing Atlas",
+          confidenceScore: 0.95,
+          importanceScore: 8,
+        },
+      ]),
     ),
+  );
+
+  const memories = await extractor.extract("I am developing Atlas");
+
+  assert.deepEqual(
+    memories.map((memory) => [memory.type, memory.content]),
+    [
+      [MemoryType.RELATIONSHIP, "User's building is Atlas"],
+      [MemoryType.FACT, "Atlas is being built"],
+    ],
   );
 });

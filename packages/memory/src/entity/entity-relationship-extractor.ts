@@ -6,6 +6,16 @@ export interface ExtractedEntityRelationship {
   entityType: EntityType;
 }
 
+const USER_IDENTITY_BLOCKLIST = new Set([
+  "building",
+  "creating",
+  "developing",
+  "making",
+  "working",
+  "coding",
+  "designing",
+]);
+
 const RELATIONSHIP_PATTERNS = [
   {
     regex: /user'?s (?:father|dad) is ([a-z][a-zA-Z]*)/i,
@@ -98,6 +108,10 @@ export function getRelationshipEntityType(relation: string): EntityType {
   return RELATIONSHIP_ENTITY_TYPES[normalizeRelationshipRelation(relation)] ?? "UNKNOWN";
 }
 
+export function isBlockedUserIdentityName(name: string): boolean {
+  return USER_IDENTITY_BLOCKLIST.has(name.trim().toLowerCase());
+}
+
 export function normalizeRelationshipContent(content: string): string {
   const trimmed = content.trim();
 
@@ -130,6 +144,13 @@ export class EntityRelationshipExtractor {
       const match = normalizedContent.match(pattern.regex);
 
       if (!match) {
+        continue;
+      }
+
+      if (
+        pattern.relation === "self" &&
+        isBlockedUserIdentityName(match[1])
+      ) {
         continue;
       }
 
