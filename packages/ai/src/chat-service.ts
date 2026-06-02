@@ -23,6 +23,9 @@ import {
   ExperienceRepository,
   MoodEngine,
   MoodRepository,
+  EmotionEngine,
+  InterestEngine,
+  ExperienceType,
   buildBehaviorPrompt,
 } from "@arcon/personality";
 import { PromptBuilder } from "./prompt-builder.js";
@@ -46,12 +49,15 @@ export interface ChatServiceOptions {
 export class ChatService {
   private readonly experiences: ExperienceManager;
   private readonly moodEngine: MoodEngine;
+  private readonly emotionEngine: EmotionEngine;
+  private readonly interestEngine: InterestEngine;
   private readonly entityRepository: EntityRepository;
   private readonly entityLinker: EntityMemoryLinker;
   private readonly factRepository: EntityFactRepository;
   private readonly knowledgeBuilder: EntityKnowledgeBuilder;
   private readonly conversationTracker: ConversationEntityTracker;
   private readonly moodRepository: MoodRepository;
+  private lastEmotionTimestamp: number;
 
   constructor(
     private readonly repository: MemoryRepository,
@@ -75,6 +81,10 @@ export class ChatService {
 
     this.moodEngine = new MoodEngine(this.moodRepository);
 
+    this.emotionEngine = new EmotionEngine(this.repository, this.experiences);
+    this.interestEngine = new InterestEngine(this.repository);
+    this.lastEmotionTimestamp = Date.now();
+
     this.entityRepository = new EntityRepository(
       options.entityDatabasePath ?? "./apps/chat/data/entities.sqlite",
     );
@@ -96,18 +106,26 @@ export class ChatService {
   }
 
   async chat(message: string): Promise<ChatResult> {
+    const now = Date.now();
+    const elapsed = now - this.lastEmotionTimestamp;
+
+    this.emotionEngine.decay(elapsed);
+    this.interestEngine.decay(elapsed);
+
+    this.lastEmotionTimestamp = now;
+
     this.moodEngine.recordUserTurn(message);
+    this.interestEngine.updateFromText(message);
 
     const experience = classifyExperience(message);
 
-    if (experience === "USER_ASKED_IDENTITY") {
-      this.moodEngine.increaseFrustration(0.02);
-    }
-
     if (experience) {
+      this.emotionEngine.updateOnEvent(experience);
       this.experiences.record(experience);
 
-      // console.log("Mood:", this.moodEngine.getMood());
+      if (experience === ExperienceType.USER_ASKED_IDENTITY) {
+        this.moodEngine.increaseFrustration(0.02);
+      }
     }
 
     const intent = classifyIntent(message);
@@ -116,7 +134,7 @@ export class ChatService {
 
     const resolvedMessage = message;
 
-    const recall = new IdentityRecall(this.repository, this.experiences);
+    const recall = new IdentityRecall(this.repository, this.experiences, this.emotionEngine);
 
     const recallResult = recall.handle(message);
 
@@ -224,7 +242,16 @@ export class ChatService {
 
     const relationshipPrompt = buildRelationshipPrompt();
 
-    const behaviorPrompt = buildBehaviorPrompt(this.moodEngine.getMood());
+    const emotions = this.emotionEngine.getCurrentEmotions();
+    const moodLabel = this.emotionEngine.deriveMood();
+    const moodState = this.moodEngine.getMood();
+    const interests = this.interestEngine.getTopInterests();
+    const behaviorPrompt = buildBehaviorPrompt({
+      moodLabel,
+      emotions,
+      mood: moodState,
+      interests,
+    });
 
     const systemPrompt = [
       identityPrompt,

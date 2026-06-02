@@ -141,7 +141,45 @@ export class MemoryRepository {
 
       CREATE INDEX IF NOT EXISTS idx_personal_memories_updated
       ON personal_memories (updated_at);
+
+      CREATE TABLE IF NOT EXISTS emotions (
+        name TEXT PRIMARY KEY,
+        value REAL NOT NULL,
+        last_updated INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS interests (
+        topic TEXT PRIMARY KEY,
+        weight REAL NOT NULL,
+        last_updated INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_interests_weight
+      ON interests (weight DESC);
     `);
+
+    const emotionCount = this.db
+      .prepare("SELECT COUNT(*) as count FROM emotions")
+      .get() as { count: number };
+
+    if (emotionCount.count === 0) {
+      const now = Date.now();
+      const defaultEmotions = [
+        "happiness",
+        "frustration",
+        "curiosity",
+        "trust",
+        "confidence",
+      ];
+
+      for (const name of defaultEmotions) {
+        this.db
+          .prepare(
+            `INSERT INTO emotions (name, value, last_updated) VALUES (?, ?, ?)`,
+          )
+          .run(name, 0, now);
+      }
+    }
   }
 
   createMemory(input: CreateMemoryInput): Memory {
@@ -264,6 +302,67 @@ export class MemoryRepository {
     }
 
     return (this.db.prepare("SELECT * FROM personal_memories ORDER BY updated_at DESC, created_at DESC").all() as MemoryRow[]).map(toMemory);
+  }
+
+  getEmotion(name: string): { name: string; value: number; lastUpdated: number } | null {
+    const row = this.db
+      .prepare("SELECT name, value, last_updated FROM emotions WHERE name = ?")
+      .get(name) as { name: string; value: number; last_updated: number } | undefined;
+
+    return row
+      ? { name: row.name, value: row.value, lastUpdated: row.last_updated }
+      : null;
+  }
+
+  listEmotions(): Array<{ name: string; value: number; lastUpdated: number }> {
+    return (
+      this.db
+        .prepare("SELECT name, value, last_updated FROM emotions ORDER BY name ASC")
+        .all() as Array<{ name: string; value: number; last_updated: number }>
+    ).map((row) => ({ name: row.name, value: row.value, lastUpdated: row.last_updated }));
+  }
+
+  saveEmotion(name: string, value: number, lastUpdated: number): void {
+    this.db
+      .prepare(
+        `INSERT INTO emotions (name, value, last_updated)
+         VALUES (?, ?, ?)
+         ON CONFLICT(name) DO UPDATE SET value = excluded.value, last_updated = excluded.last_updated`,
+      )
+      .run(name, value, lastUpdated);
+  }
+
+  getInterest(topic: string): { topic: string; weight: number; lastUpdated: number } | null {
+    const row = this.db
+      .prepare("SELECT topic, weight, last_updated FROM interests WHERE topic = ?")
+      .get(topic) as { topic: string; weight: number; last_updated: number } | undefined;
+
+    return row
+      ? { topic: row.topic, weight: row.weight, lastUpdated: row.last_updated }
+      : null;
+  }
+
+  listInterests(): Array<{ topic: string; weight: number; lastUpdated: number }> {
+    return (
+      this.db
+        .prepare("SELECT topic, weight, last_updated FROM interests ORDER BY weight DESC, topic ASC")
+        .all() as Array<{ topic: string; weight: number; last_updated: number }>
+    ).map((row) => ({ topic: row.topic, weight: row.weight, lastUpdated: row.last_updated }));
+  }
+
+  saveInterest(topic: string, weight: number, lastUpdated: number): void {
+    this.db
+      .prepare(
+        `INSERT INTO interests (topic, weight, last_updated)
+         VALUES (?, ?, ?)
+         ON CONFLICT(topic) DO UPDATE SET weight = excluded.weight, last_updated = excluded.last_updated`,
+      )
+      .run(topic, weight, lastUpdated);
+  }
+
+  deleteInterest(topic: string): boolean {
+    const result = this.db.prepare("DELETE FROM interests WHERE topic = ?").run(topic);
+    return result.changes > 0;
   }
 
   close(): void {

@@ -1,13 +1,4 @@
-export enum ExperienceType {
-  USER_ASKED_IDENTITY =
-    "USER_ASKED_IDENTITY",
-
-  USER_ASKED_RELATIONSHIP =
-    "USER_ASKED_RELATIONSHIP",
-
-  USER_ASKED_ARCON_IDENTITY =
-    "USER_ASKED_ARCON_IDENTITY",
-}
+import { ExperienceType } from "@arcon/personality";
 
 export function classifyExperience(
   message: string,
@@ -31,6 +22,15 @@ export function classifyExperience(
     text.includes("who are you")
   ) {
     return ExperienceType.USER_ASKED_ARCON_IDENTITY;
+  }
+
+  if (
+    text.includes("thank you") ||
+    text.includes("good job") ||
+    text.includes("well done") ||
+    text.includes("nice work")
+  ) {
+    return ExperienceType.USER_PRAISED_ARCON;
   }
 
   return null;

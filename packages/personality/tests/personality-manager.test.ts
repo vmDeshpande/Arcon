@@ -45,13 +45,24 @@ describe("PersonalityManager", () => {
 
   it("behavior prompt changes instruction thresholds by ask count", () => {
     const prompt = buildBehaviorPrompt({
-      curiosity: 0.5,
-      frustration: 5,
-      askCount: 6,
-      pendingQuestion: false,
-      trust: 0.5,
-      excitement: 0.5,
-      updatedAt: new Date().toISOString(),
+      moodLabel: "skeptical",
+      emotions: {
+        happiness: 0.2,
+        frustration: 0.5,
+        curiosity: 0.4,
+        trust: 0.5,
+        confidence: 0.3,
+      },
+      mood: {
+        curiosity: 0.5,
+        frustration: 5,
+        askCount: 6,
+        pendingQuestion: false,
+        trust: 0.5,
+        excitement: 0.5,
+        updatedAt: new Date().toISOString(),
+      },
+      interests: [],
     });
 
     assert(prompt.includes("Frustration Level: 5"));

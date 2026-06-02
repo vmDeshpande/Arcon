@@ -1,7 +1,5 @@
 import { MemoryRepository, MemoryType } from "@arcon/memory";
-import { ARCON_IDENTITY } from "@arcon/personality";
-import { ExperienceManager } from "@arcon/personality";
-import { ExperienceType } from "../experience/experience-classifier.js";
+import { ARCON_IDENTITY, EmotionEngine, ExperienceManager, ExperienceType } from "@arcon/personality";
 
 export interface RecallResult {
   handled: boolean;
@@ -12,6 +10,7 @@ export class IdentityRecall {
   constructor(
     private readonly repository: MemoryRepository,
     private readonly experiences: ExperienceManager,
+    private readonly emotionEngine: EmotionEngine,
   ) {}
 
   handle(message: string): RecallResult {
@@ -38,25 +37,26 @@ export class IdentityRecall {
     const identityQuestionCount = this.experiences.getCount(
       ExperienceType.USER_ASKED_IDENTITY,
     );
+    const frustration = this.emotionEngine.getCurrentEmotions().frustration;
 
     if (normalized === "who am i?" || normalized === "who am i") {
       return {
         handled: true,
-        reply: this.buildUserIdentity(identityQuestionCount),
+        reply: this.buildUserIdentity(identityQuestionCount, frustration),
       };
     }
 
     if (normalized.includes("what do you know about me")) {
       return {
         handled: true,
-        reply: this.buildUserIdentity(identityQuestionCount),
+        reply: this.buildUserIdentity(identityQuestionCount, frustration),
       };
     }
 
     if (normalized.includes("list everything you remember about me")) {
       return {
         handled: true,
-        reply: this.buildUserIdentity(identityQuestionCount),
+        reply: this.buildUserIdentity(identityQuestionCount, frustration),
       };
     }
 
@@ -65,10 +65,16 @@ export class IdentityRecall {
     };
   }
 
-  private buildUserIdentity(askCount: number): string {
+  private buildUserIdentity(askCount: number, frustration: number): string {
     const memories = this.repository.listMemories();
 
     const lines: string[] = [];
+
+    if (frustration > 0.6) {
+      lines.push("You’ve asked this question enough times that it feels familiar.");
+      lines.push("I want to answer carefully so it still feels accurate.");
+      lines.push("");
+    }
 
     if (askCount === 1) {
       lines.push("Here is what I currently know about you:");
