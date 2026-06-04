@@ -1,10 +1,10 @@
 import type { PersonalityProfile } from "./personality-profile.js";
-import { MoodEngine } from "../mood/mood-engine.js";
+import { EmotionManager } from "../emotion/emotion-manager.js";
 
 export class PersonalityManager {
   constructor(
     private readonly profile: PersonalityProfile,
-    private readonly moodEngine: MoodEngine
+    private readonly moodEngine: EmotionManager
   ) {}
 
   getProfile(): PersonalityProfile {
@@ -12,7 +12,7 @@ export class PersonalityManager {
   }
 
   getSystemPrompt(): string {
-    const mood = this.moodEngine.getMood();
+    const mood = this.moodEngine.getMoodState();
 
     return `
 You are ${this.profile.name}.
@@ -22,6 +22,8 @@ Current mood:
 - Frustration Level: ${mood.frustration}
 - Ask Count: ${mood.askCount}
 - Pending Question: ${mood.pendingQuestion ? "yes" : "no"}
+- Trust: ${mood.trust}
+- Excitement: ${mood.excitement}
 
 Core traits:
 - Curiosity: ${this.profile.traits.curiosity}
@@ -31,6 +33,9 @@ Core traits:
 - Creativity: ${this.profile.traits.creativity}
 
 Stay consistent with these traits.
+Treat the mood values as active behavior controls, not passive metadata.
+When frustration is high, become concise and less eager without becoming rude.
+When curiosity is high and ask count is low, explore the topic more actively.
 `.trim();
   }
 }

@@ -18,42 +18,94 @@ const DEFAULT_EMOTIONS: Emotions = {
   confidence: 0,
 };
 
-const EVENT_IMPACT: Record<ExperienceType, Partial<Emotions>> = {
+const EVENT_IMPACT: Partial<Record<ExperienceType, Partial<Emotions>>> = {
   [ExperienceType.USER_ASKED_IDENTITY]: {
-    frustration: 0.05,
-    curiosity: 0.03,
+    frustration: 0.04,
+    curiosity: -0.02,
   },
   [ExperienceType.USER_ASKED_RELATIONSHIP]: {
-    trust: 0.04,
-    curiosity: 0.02,
+    trust: 0.06,
+    curiosity: 0.04,
   },
   [ExperienceType.USER_ASKED_ARCON_IDENTITY]: {
-    frustration: 0.04,
-    trust: -0.03,
-    curiosity: 0.02,
+    trust: 0.05,
+    curiosity: 0.08,
   },
   [ExperienceType.USER_PRAISED_ARCON]: {
-    happiness: 0.1,
-    trust: 0.08,
+    happiness: 0.15,
+    trust: 0.1,
     confidence: 0.05,
   },
   [ExperienceType.USER_ASKED_SELF]: {
+    trust: 0.05,
+    curiosity: 0.08,
+  },
+  [ExperienceType.USER_TESTED_MEMORY]: {
+    frustration: 0.05,
+    curiosity: -0.03,
+  },
+  [ExperienceType.USER_CORRECTED_ARCON]: {
+    confidence: 0.05,
+    trust: 0.02,
+  },
+  [ExperienceType.USER_CORRECTED_MEMORY]: {
+    confidence: 0.05,
+    trust: 0.02,
+  },
+  [ExperienceType.USER_CONFIRMED_MEMORY]: {
+    confidence: 0.06,
+    trust: 0.06,
+  },
+  [ExperienceType.USER_SHARED_PREFERENCE]: {
+    happiness: 0.05,
+    trust: 0.05,
+    curiosity: 0.03,
+  },
+  [ExperienceType.USER_SHARED_RELATIONSHIP]: {
+    trust: 0.05,
+    happiness: 0.02,
+  },
+  [ExperienceType.USER_SHARED_PROJECT]: {
+    curiosity: 0.15,
+    trust: 0.1,
+    happiness: 0.05,
+  },
+  [ExperienceType.USER_ASKED_PROJECT]: {
+    curiosity: 0.08,
+    trust: 0.04,
+  },
+  [ExperienceType.USER_SHOWED_INTEREST]: {
+    curiosity: 0.1,
+    happiness: 0.03,
+  },
+  [ExperienceType.USER_EXPRESSED_FRUSTRATION]: {
     frustration: 0.08,
-    curiosity: 0.02,
+    confidence: -0.03,
+  },
+  [ExperienceType.USER_EXPRESSED_POSITIVE_FEEDBACK]: {
+    happiness: 0.15,
+    trust: 0.1,
+    confidence: 0.05,
   },
 };
 
-const DECAY_RATE_PER_MILLISECOND = 0.00000025;
+const DECAY_RATE_PER_MILLISECOND: Record<keyof Emotions, number> = {
+  happiness: 0.00000008,
+  frustration: 0.00000004,
+  curiosity: 0.000000035,
+  trust: 0.00000001,
+  confidence: 0.00000001,
+};
 
 export class EmotionEngine {
   constructor(
-    private readonly memoryRepo: MemoryRepository,
+    protected readonly memoryRepo: MemoryRepository,
     private readonly experiences: ExperienceManager,
   ) {
     this.initializeEmotionState();
   }
 
-  updateOnEvent(eventType: ExperienceType): void {
+  updateOnEvent(eventType: ExperienceType, reason: string = eventType): void {
     this.initializeEmotionState();
 
     const current = this.getCurrentEmotions();
@@ -72,6 +124,7 @@ export class EmotionEngine {
     };
 
     this.saveEmotions(next);
+    this.debugEmotionUpdate(eventType, current, next, reason);
   }
 
   decay(elapsedMillis: number): void {
@@ -79,17 +132,17 @@ export class EmotionEngine {
       return;
     }
 
-    const decayFactor = Math.exp(-DECAY_RATE_PER_MILLISECOND * elapsedMillis);
     const current = this.getCurrentEmotions();
     const next: Emotions = {
-      happiness: this.clamp(current.happiness * decayFactor),
-      frustration: this.clamp(current.frustration * decayFactor),
-      curiosity: this.clamp(current.curiosity * decayFactor),
-      trust: this.clamp(current.trust * decayFactor),
-      confidence: this.clamp(current.confidence * decayFactor),
+      happiness: this.decayEmotion(current.happiness, "happiness", elapsedMillis),
+      frustration: this.decayEmotion(current.frustration, "frustration", elapsedMillis),
+      curiosity: this.decayEmotion(current.curiosity, "curiosity", elapsedMillis),
+      trust: this.decayEmotion(current.trust, "trust", elapsedMillis),
+      confidence: this.decayEmotion(current.confidence, "confidence", elapsedMillis),
     };
 
     this.saveEmotions(next);
+    this.debugEmotionUpdate("decay", current, next, `${elapsedMillis}ms elapsed`);
   }
 
   getCurrentEmotions(): Emotions {
@@ -155,7 +208,7 @@ export class EmotionEngine {
     }
   }
 
-  private saveEmotions(emotions: Emotions): void {
+  protected saveEmotions(emotions: Emotions): void {
     const now = Date.now();
 
     for (const key of Object.keys(emotions) as Array<keyof Emotions>) {
@@ -163,7 +216,34 @@ export class EmotionEngine {
     }
   }
 
-  private clamp(value: number): number {
+  protected clamp(value: number): number {
     return Math.min(1, Math.max(0, value));
+  }
+
+  private decayEmotion(
+    value: number,
+    emotion: keyof Emotions,
+    elapsedMillis: number,
+  ): number {
+    const decayFactor = Math.exp(-DECAY_RATE_PER_MILLISECOND[emotion] * elapsedMillis);
+    return this.clamp(value * decayFactor);
+  }
+
+  private debugEmotionUpdate(
+    event: ExperienceType | "decay",
+    previous: Emotions,
+    next: Emotions,
+    reason: string,
+  ): void {
+    if (process.env.ARCON_EMOTION_DEBUG !== "1") {
+      return;
+    }
+
+    console.log("[Arcon Emotion Update]", {
+      event,
+      previous,
+      next,
+      reason,
+    });
   }
 }

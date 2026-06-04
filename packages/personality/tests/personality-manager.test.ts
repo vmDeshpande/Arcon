@@ -6,17 +6,17 @@ import { join } from "node:path";
 
 import {
   DEFAULT_PERSONALITY,
-  MoodEngine,
-  MoodRepository,
+  EmotionManager,
   PersonalityManager,
   buildBehaviorPrompt,
 } from "../src/index.js";
+import { MemoryRepository } from "@arcon/memory";
 
 function createMoodEngine() {
   const dir = mkdtempSync(join(tmpdir(), "arcon-mood-"));
-  const repository = new MoodRepository(join(dir, "mood.sqlite"));
+  const repository = new MemoryRepository(join(dir, "personal-memory.sqlite"));
   return {
-    engine: new MoodEngine(repository),
+    engine: new EmotionManager(repository, { getCount: () => 0, record: () => {} } as any),
     repository,
   };
 }
@@ -63,10 +63,44 @@ describe("PersonalityManager", () => {
         updatedAt: new Date().toISOString(),
       },
       interests: [],
+      arconInterests: [
+        { topic: "programming", weight: 0.8 },
+      ],
     });
 
     assert(prompt.includes("Frustration Level: 5"));
     assert(prompt.includes("Ask Count: 6"));
     assert(prompt.includes("Mostly use statements"));
+    assert(prompt.includes("Arcon interests: programming"));
+    assert(prompt.includes("Do not say you have no emotions"));
+    assert(prompt.includes("Curiosity above 0.60"));
+  });
+
+  it("behavior prompt strongly couples high emotion values to response style", () => {
+    const prompt = buildBehaviorPrompt({
+      moodLabel: "curious",
+      emotions: {
+        happiness: 0.7,
+        frustration: 0.7,
+        curiosity: 0.8,
+        trust: 0.7,
+        confidence: 0.7,
+      },
+      mood: {
+        curiosity: 0.8,
+        frustration: 7,
+        askCount: 1,
+        pendingQuestion: false,
+        trust: 0.7,
+        excitement: 0.7,
+        updatedAt: new Date().toISOString(),
+      },
+      interests: [],
+    });
+
+    assert(prompt.includes("ask more specific follow-up questions"));
+    assert(prompt.includes("reference relevant memories naturally"));
+    assert(prompt.includes("reduce hedging"));
+    assert(prompt.includes("keep replies shorter"));
   });
 });

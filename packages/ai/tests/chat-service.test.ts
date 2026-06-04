@@ -131,4 +131,76 @@ describe("ChatService behavior state", () => {
 
     moodRepository.close();
   });
+
+  it("develops noticeable emotions from positive project and interest conversation", async () => {
+    const { service, repository } = createService([
+      "[]",
+      "I will remember that.",
+      "[]",
+      "Programming seems important to you.",
+      "[]",
+      "I will pay attention to learning.",
+    ]);
+
+    await service.chat("I am building Arcon");
+    await service.chat("I like programming");
+    await service.chat("I want you to learn");
+
+    const emotions = repository.listEmotions();
+    const emotionValue = (name: string) =>
+      emotions.find((emotion) => emotion.name === name)?.value ?? 0;
+
+    assert.ok(emotionValue("curiosity") >= 0.25);
+    assert.ok(emotionValue("trust") >= 0.15);
+    assert.ok(emotionValue("happiness") >= 0.1);
+
+    service.close();
+    repository.close();
+  });
+
+  it("recalls Arcon interests from stored Arcon interest data", async () => {
+    const { service, repository } = createService([
+      "[]",
+      "I will remember that.",
+      "[]",
+      "Programming seems important to you.",
+      "[]",
+      "I will pay attention to learning.",
+    ]);
+
+    await service.chat("I am building Arcon");
+    await service.chat("I like programming");
+    await service.chat("I want you to learn");
+
+    const result = await service.chat("What are your interests?");
+
+    assert(result.reply.includes("programming"));
+    assert(result.reply.includes("learning"));
+    assert.equal(repository.listInterests().some((interest) => interest.topic === "programming"), true);
+    assert.equal(repository.listArconInterests().some((interest) => interest.topic === "programming"), true);
+
+    service.close();
+    repository.close();
+  });
+
+  it("answers emotion and self-reflection questions from Arcon's self-model", async () => {
+    const { service, repository } = createService([
+      "[]",
+      "I will remember that.",
+    ]);
+
+    await service.chat("I am building Arcon");
+
+    const emotionResult = await service.chat("Do you have emotions?");
+    const selfResult = await service.chat("What do you think about yourself?");
+
+    assert(emotionResult.reply.includes("simple emotional state"));
+    assert(emotionResult.reply.includes("curiosity"));
+    assert(!emotionResult.reply.toLowerCase().includes("do not have emotions"));
+    assert(selfResult.reply.includes("I am Arcon."));
+    assert(selfResult.reply.includes("memory"));
+
+    service.close();
+    repository.close();
+  });
 });

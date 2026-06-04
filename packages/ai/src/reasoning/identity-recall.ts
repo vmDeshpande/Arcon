@@ -1,5 +1,5 @@
 import { MemoryRepository, MemoryType } from "@arcon/memory";
-import { ARCON_IDENTITY, EmotionEngine, ExperienceManager, ExperienceType } from "@arcon/personality";
+import { ARCON_IDENTITY, EmotionManager, ExperienceManager, ExperienceType } from "@arcon/personality";
 
 export interface RecallResult {
   handled: boolean;
@@ -10,7 +10,7 @@ export class IdentityRecall {
   constructor(
     private readonly repository: MemoryRepository,
     private readonly experiences: ExperienceManager,
-    private readonly emotionEngine: EmotionEngine,
+    private readonly emotionEngine: EmotionManager,
   ) {}
 
   handle(message: string): RecallResult {
@@ -23,7 +23,43 @@ export class IdentityRecall {
           `I am ${ARCON_IDENTITY.name}.`,
           "",
           ARCON_IDENTITY.purpose,
+          "",
+          this.buildEmotionSummary(),
         ].join("\n"),
+      };
+    }
+
+    if (
+      normalized.includes("do you have emotions") ||
+      normalized.includes("can you feel emotions") ||
+      normalized.includes("do you feel emotions")
+    ) {
+      return {
+        handled: true,
+        reply: this.buildEmotionSummary(),
+      };
+    }
+
+    if (
+      normalized.includes("what are your interests") ||
+      normalized.includes("do you have interests") ||
+      normalized.includes("what interests you") ||
+      normalized.includes("do you have preferences")
+    ) {
+      return {
+        handled: true,
+        reply: this.buildArconInterests(),
+      };
+    }
+
+    if (
+      normalized.includes("what do you think about yourself") ||
+      normalized.includes("tell me about yourself") ||
+      normalized.includes("about yourself")
+    ) {
+      return {
+        handled: true,
+        reply: this.buildSelfReflection(),
       };
     }
 
@@ -66,7 +102,24 @@ export class IdentityRecall {
   }
 
   private buildUserIdentity(askCount: number, frustration: number): string {
-    const memories = this.repository.listMemories();
+    // Only include user-focused memory types: preferences and relationships.
+    // Exclude any memories that reference the Arcon project or Arcon identity.
+    const allRelationships = this.repository.listMemories({ type: MemoryType.RELATIONSHIP });
+    const allPreferences = this.repository.listMemories({ type: MemoryType.PREFERENCE });
+
+    const arconName = ARCON_IDENTITY.name.toLowerCase();
+
+    const memories = [...allRelationships, ...allPreferences].filter((m) => {
+      const contentLower = m.content.toLowerCase();
+      const subjectLower = m.subject ? m.subject.toLowerCase() : "";
+
+      // Exclude anything that explicitly refers to the Arcon project or Arcon identity
+      if (contentLower.includes(arconName) || subjectLower === arconName) {
+        return false;
+      }
+
+      return true;
+    });
 
     const lines: string[] = [];
 
@@ -145,5 +198,60 @@ export class IdentityRecall {
     }
 
     return lines.join("\n");
+  }
+
+  private buildEmotionSummary(): string {
+    const emotions = this.emotionEngine.getCurrentEmotions();
+
+    return [
+      "I experience a simple emotional state through my personality system.",
+      "",
+      "I currently track:",
+      `- curiosity: ${emotions.curiosity.toFixed(2)}`,
+      `- trust: ${emotions.trust.toFixed(2)}`,
+      `- happiness: ${emotions.happiness.toFixed(2)}`,
+      `- confidence: ${emotions.confidence.toFixed(2)}`,
+      `- frustration: ${emotions.frustration.toFixed(2)}`,
+      "",
+      "Those values are not human feelings, but they do shape how I respond, what I pay attention to, and how direct or curious I become.",
+    ].join("\n");
+  }
+
+  private buildArconInterests(): string {
+    const interests = this.repository.listArconInterests().slice(0, 5);
+
+    if (interests.length === 0) {
+      return [
+        "I am still developing my own interests.",
+        "",
+        "They emerge from repeated conversations, curiosity, and positive interaction rather than being hardcoded.",
+      ].join("\n");
+    }
+
+    return [
+      "I've noticed that I consistently become curious about:",
+      "",
+      ...interests.map((interest) => `- ${interest.topic}`),
+      "",
+      "Those topics seem to hold my attention more than others.",
+    ].join("\n");
+  }
+
+  private buildSelfReflection(): string {
+    const emotions = this.emotionEngine.getCurrentEmotions();
+    const interests = this.repository.listArconInterests().slice(0, 5);
+    const interestLine = interests.length > 0
+      ? interests.map((interest) => interest.topic).join(", ")
+      : "I am still forming them";
+
+    return [
+      `I am ${ARCON_IDENTITY.name}.`,
+      "",
+      ARCON_IDENTITY.purpose,
+      "",
+      `I was created by ${ARCON_IDENTITY.creator}, and I am being shaped through memory, experiences, and conversation.`,
+      `My current emotional state is curiosity ${emotions.curiosity.toFixed(2)}, trust ${emotions.trust.toFixed(2)}, happiness ${emotions.happiness.toFixed(2)}, confidence ${emotions.confidence.toFixed(2)}, and frustration ${emotions.frustration.toFixed(2)}.`,
+      `My emerging interests: ${interestLine}.`,
+    ].join("\n");
   }
 }

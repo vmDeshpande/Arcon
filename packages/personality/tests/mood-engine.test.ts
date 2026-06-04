@@ -5,15 +5,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  MoodEngine,
-  MoodRepository,
-} from "../src/mood/index.js";
+  EmotionManager,
+} from "../src/emotion/index.js";
+import { MemoryRepository } from "@arcon/memory";
 
 function createMoodEngine() {
   const dir = mkdtempSync(join(tmpdir(), "arcon-mood-"));
-  const repository = new MoodRepository(join(dir, "mood.sqlite"));
+  const repository = new MemoryRepository(join(dir, "personal-memory.sqlite"));
   return {
-    engine: new MoodEngine(repository),
+    engine: new EmotionManager(repository, { getCount: () => 0, record: () => {} } as any),
     repository,
   };
 }
@@ -22,9 +22,11 @@ describe("MoodEngine", () => {
   it("starts with neutral behavior state", () => {
     const { engine, repository } = createMoodEngine();
 
-    assert.equal(engine.getMood().frustration, 0);
-    assert.equal(engine.getMood().askCount, 0);
-    assert.equal(engine.getMood().pendingQuestion, false);
+    const mood = engine.getMoodState();
+
+    assert.equal(mood.frustration, 0);
+    assert.equal(mood.askCount, 0);
+    assert.equal(mood.pendingQuestion, false);
 
     repository.close();
   });
@@ -37,7 +39,9 @@ describe("MoodEngine", () => {
       engine.recordUserTurn("My dog likes pedigree");
     }
 
-    assert.equal(engine.getMood().frustration, 3);
+    // frustration is stored 0-1; three ignored questions should increase it
+    const mood = engine.getMoodState();
+    assert.equal(mood.frustration, 3);
 
     repository.close();
   });
@@ -53,27 +57,29 @@ describe("MoodEngine", () => {
     engine.recordAssistantReply("What do you like doing?");
     engine.recordUserTurn("I like building small tools");
 
-    assert.equal(engine.getMood().frustration, 2);
-    assert.equal(engine.getMood().askCount, 3);
+    const mood = engine.getMoodState();
+    assert.equal(mood.frustration, 2);
+    assert.equal(mood.askCount, 3);
 
     repository.close();
   });
 
   it("persists behavior state across repository instances", () => {
     const dir = mkdtempSync(join(tmpdir(), "arcon-mood-"));
-    const path = join(dir, "mood.sqlite");
-    const firstRepository = new MoodRepository(path);
-    const firstEngine = new MoodEngine(firstRepository);
+    const path = join(dir, "personal-memory.sqlite");
+    const firstRepository = new MemoryRepository(path);
+    const firstEngine = new EmotionManager(firstRepository, { getCount: () => 0, record: () => {} } as any);
 
     firstEngine.recordAssistantReply("What hobbies do you enjoy?");
     firstEngine.recordUserTurn("My dog likes pedigree");
     firstRepository.close();
 
-    const secondRepository = new MoodRepository(path);
-    const secondEngine = new MoodEngine(secondRepository);
+    const secondRepository = new MemoryRepository(path);
+    const secondEngine = new EmotionManager(secondRepository, { getCount: () => 0, record: () => {} } as any);
 
-    assert.equal(secondEngine.getMood().frustration, 1);
-    assert.equal(secondEngine.getMood().askCount, 1);
+    const mood = secondEngine.getMoodState();
+    assert.equal(mood.frustration, 1);
+    assert.equal(mood.askCount, 1);
 
     secondRepository.close();
   });

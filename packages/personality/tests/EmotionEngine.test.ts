@@ -45,16 +45,33 @@ describe("EmotionEngine and InterestEngine", () => {
     memoryRepo.close();
   });
 
-  it("increases frustration when self questions are repeated", () => {
+  it("applies calibrated emotional growth for project, preference, and interest events", () => {
     const { memoryRepo, experienceRepo, emotionEngine } = createTestContext();
 
-    emotionEngine.updateOnEvent(ExperienceType.USER_ASKED_SELF);
-    emotionEngine.updateOnEvent(ExperienceType.USER_ASKED_SELF);
-    emotionEngine.updateOnEvent(ExperienceType.USER_ASKED_SELF);
+    emotionEngine.updateOnEvent(ExperienceType.USER_SHARED_PROJECT);
+    emotionEngine.updateOnEvent(ExperienceType.USER_SHARED_PREFERENCE);
+    emotionEngine.updateOnEvent(ExperienceType.USER_SHOWED_INTEREST);
 
     const emotions = emotionEngine.getCurrentEmotions();
 
-    assert.ok(emotions.frustration > 0, "frustration should rise after repeated self questions");
+    assert.ok(emotions.curiosity >= 0.28, "curiosity should increase noticeably");
+    assert.ok(emotions.trust >= 0.15, "trust should increase noticeably");
+    assert.ok(emotions.happiness >= 0.13, "happiness should increase noticeably");
+
+    experienceRepo.close();
+    memoryRepo.close();
+  });
+
+  it("increases frustration when memory tests are repeated", () => {
+    const { memoryRepo, experienceRepo, emotionEngine } = createTestContext();
+
+    emotionEngine.updateOnEvent(ExperienceType.USER_TESTED_MEMORY);
+    emotionEngine.updateOnEvent(ExperienceType.USER_TESTED_MEMORY);
+    emotionEngine.updateOnEvent(ExperienceType.USER_TESTED_MEMORY);
+
+    const emotions = emotionEngine.getCurrentEmotions();
+
+    assert.ok(emotions.frustration > 0, "frustration should rise after repeated memory tests");
 
     experienceRepo.close();
     memoryRepo.close();
@@ -78,6 +95,29 @@ describe("EmotionEngine and InterestEngine", () => {
     assert.ok(afterEmotions.happiness < beforeEmotions.happiness, "happiness should decay over time");
     assert.ok(afterInterests.length > 0, "interests should still exist after decay");
     assert.ok(afterInterests[0].weight <= beforeInterests[0].weight, "interest weight should decrease after decay");
+
+    experienceRepo.close();
+    memoryRepo.close();
+  });
+
+  it("keeps trust and confidence stable longer than happiness", () => {
+    const { memoryRepo, experienceRepo, emotionEngine } = createTestContext();
+
+    emotionEngine.updateOnEvent(ExperienceType.USER_EXPRESSED_POSITIVE_FEEDBACK);
+    emotionEngine.updateOnEvent(ExperienceType.USER_CONFIRMED_MEMORY);
+
+    const before = emotionEngine.getCurrentEmotions();
+
+    emotionEngine.decay(24 * 3600 * 1000);
+
+    const after = emotionEngine.getCurrentEmotions();
+
+    const happinessRetention = after.happiness / before.happiness;
+    const trustRetention = after.trust / before.trust;
+    const confidenceRetention = after.confidence / before.confidence;
+
+    assert.ok(trustRetention > happinessRetention, "trust should decay more slowly than happiness");
+    assert.ok(confidenceRetention > happinessRetention, "confidence should decay more slowly than happiness");
 
     experienceRepo.close();
     memoryRepo.close();

@@ -156,6 +156,15 @@ export class MemoryRepository {
 
       CREATE INDEX IF NOT EXISTS idx_interests_weight
       ON interests (weight DESC);
+
+      CREATE TABLE IF NOT EXISTS arcon_interests (
+        topic TEXT PRIMARY KEY,
+        weight REAL NOT NULL,
+        last_updated INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_arcon_interests_weight
+      ON arcon_interests (weight DESC);
     `);
 
     const emotionCount = this.db
@@ -362,6 +371,39 @@ export class MemoryRepository {
 
   deleteInterest(topic: string): boolean {
     const result = this.db.prepare("DELETE FROM interests WHERE topic = ?").run(topic);
+    return result.changes > 0;
+  }
+
+  getArconInterest(topic: string): { topic: string; weight: number; lastUpdated: number } | null {
+    const row = this.db
+      .prepare("SELECT topic, weight, last_updated FROM arcon_interests WHERE topic = ?")
+      .get(topic) as { topic: string; weight: number; last_updated: number } | undefined;
+
+    return row
+      ? { topic: row.topic, weight: row.weight, lastUpdated: row.last_updated }
+      : null;
+  }
+
+  listArconInterests(): Array<{ topic: string; weight: number; lastUpdated: number }> {
+    return (
+      this.db
+        .prepare("SELECT topic, weight, last_updated FROM arcon_interests ORDER BY weight DESC, topic ASC")
+        .all() as Array<{ topic: string; weight: number; last_updated: number }>
+    ).map((row) => ({ topic: row.topic, weight: row.weight, lastUpdated: row.last_updated }));
+  }
+
+  saveArconInterest(topic: string, weight: number, lastUpdated: number): void {
+    this.db
+      .prepare(
+        `INSERT INTO arcon_interests (topic, weight, last_updated)
+         VALUES (?, ?, ?)
+         ON CONFLICT(topic) DO UPDATE SET weight = excluded.weight, last_updated = excluded.last_updated`,
+      )
+      .run(topic, weight, lastUpdated);
+  }
+
+  deleteArconInterest(topic: string): boolean {
+    const result = this.db.prepare("DELETE FROM arcon_interests WHERE topic = ?").run(topic);
     return result.changes > 0;
   }
 

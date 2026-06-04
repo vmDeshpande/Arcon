@@ -69,4 +69,45 @@ describe("InterestEngine extraction rules", () => {
 
     repo.close();
   });
+
+  it("stores Arcon interests separately from user interests", () => {
+    const { repo, engine } = createContext();
+
+    engine.updateArconFromText("I am building Arcon with programming and memory systems", {
+      curiosity: 0.7,
+      happiness: 0.4,
+      trust: 0.4,
+    });
+
+    const userInterests = repo.listInterests();
+    const arconInterests = repo.listArconInterests();
+
+    assert.equal(userInterests.length, 0);
+    assert.ok(arconInterests.some((interest) => interest.topic === "programming"));
+    assert.ok(arconInterests.some((interest) => interest.topic === "memory systems"));
+
+    repo.close();
+  });
+
+  it("increases Arcon interest weights through repeated curious conversations", () => {
+    const { repo, engine } = createContext();
+
+    engine.updateArconFromText("Programming and AI systems are important here", {
+      curiosity: 0.5,
+      happiness: 0.2,
+      trust: 0.2,
+    });
+    const first = repo.getArconInterest("programming")?.weight ?? 0;
+
+    engine.updateArconFromText("I want you to learn more about programming", {
+      curiosity: 0.8,
+      happiness: 0.5,
+      trust: 0.5,
+    });
+    const second = repo.getArconInterest("programming")?.weight ?? 0;
+
+    assert.ok(second > first);
+
+    repo.close();
+  });
 });

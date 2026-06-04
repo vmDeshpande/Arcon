@@ -23,7 +23,7 @@ import {
   ExperienceRepository,
   MoodEngine,
   MoodRepository,
-  EmotionEngine,
+  EmotionManager,
   InterestEngine,
   ExperienceType,
   buildBehaviorPrompt,
@@ -31,6 +31,7 @@ import {
 import { PromptBuilder } from "./prompt-builder.js";
 import { classifyIntent, IntentType } from "./context/intent-classifier.js";
 import { IdentityRecall } from "./reasoning/identity-recall.js";
+import { ProjectRecall } from "./reasoning/project-recall.js";
 import { RelationshipRecall } from "./reasoning/relationship-recall.js";
 import { classifyExperience } from "./experience/experience-classifier.js";
 import { LlmMemoryExtractor } from "./semantic-memory/index.js";
@@ -49,7 +50,7 @@ export interface ChatServiceOptions {
 export class ChatService {
   private readonly experiences: ExperienceManager;
   private readonly moodEngine: MoodEngine;
-  private readonly emotionEngine: EmotionEngine;
+  private readonly emotionEngine: EmotionManager;
   private readonly interestEngine: InterestEngine;
   private readonly entityRepository: EntityRepository;
   private readonly entityLinker: EntityMemoryLinker;
@@ -81,7 +82,7 @@ export class ChatService {
 
     this.moodEngine = new MoodEngine(this.moodRepository);
 
-    this.emotionEngine = new EmotionEngine(this.repository, this.experiences);
+    this.emotionEngine = new EmotionManager(this.repository, this.experiences);
     this.interestEngine = new InterestEngine(this.repository);
     this.lastEmotionTimestamp = Date.now();
 
@@ -115,18 +116,24 @@ export class ChatService {
     this.lastEmotionTimestamp = now;
 
     this.moodEngine.recordUserTurn(message);
-    this.interestEngine.updateFromText(message);
+    this.emotionEngine.recordUserTurn(message);
 
     const experience = classifyExperience(message);
 
     if (experience) {
-      this.emotionEngine.updateOnEvent(experience);
+      this.emotionEngine.updateOnEvent(experience, message);
       this.experiences.record(experience);
 
       if (experience === ExperienceType.USER_ASKED_IDENTITY) {
         this.moodEngine.increaseFrustration(0.02);
       }
     }
+
+    this.interestEngine.updateFromText(message);
+    this.interestEngine.updateArconFromText(
+      message,
+      this.emotionEngine.getCurrentEmotions(),
+    );
 
     const intent = classifyIntent(message);
 
@@ -142,8 +149,17 @@ export class ChatService {
 
     const relationshipResult = relationshipRecall.handle(message);
 
+    const projectRecall = new ProjectRecall(
+      this.repository,
+      this.experiences,
+      this.emotionEngine,
+    );
+
+    const projectResult = projectRecall.handle(message);
+
     if (relationshipResult.handled && relationshipResult.reply) {
       this.moodEngine.recordAssistantReply(relationshipResult.reply);
+      this.emotionEngine.recordAssistantReply(relationshipResult.reply);
 
       return {
         prompt: "",
@@ -153,10 +169,21 @@ export class ChatService {
 
     if (recallResult.handled && recallResult.reply) {
       this.moodEngine.recordAssistantReply(recallResult.reply);
+      this.emotionEngine.recordAssistantReply(recallResult.reply);
 
       return {
         prompt: "",
         reply: recallResult.reply,
+      };
+    }
+
+    if (projectResult.handled && projectResult.reply) {
+      this.moodEngine.recordAssistantReply(projectResult.reply);
+      this.emotionEngine.recordAssistantReply(projectResult.reply);
+
+      return {
+        prompt: "",
+        reply: projectResult.reply,
       };
     }
 
@@ -246,11 +273,13 @@ export class ChatService {
     const moodLabel = this.emotionEngine.deriveMood();
     const moodState = this.moodEngine.getMood();
     const interests = this.interestEngine.getTopInterests();
+    const arconInterests = this.interestEngine.getTopArconInterests();
     const behaviorPrompt = buildBehaviorPrompt({
       moodLabel,
       emotions,
       mood: moodState,
       interests,
+      arconInterests,
     });
 
     const systemPrompt = [
@@ -304,6 +333,7 @@ export class ChatService {
     const reply = await this.aiClient.generateReply(messages);
 
     this.moodEngine.recordAssistantReply(reply);
+    this.emotionEngine.recordAssistantReply(reply);
 
     return {
       prompt,
