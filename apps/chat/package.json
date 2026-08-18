@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
+    "dev:voice": "tsx src/voice.ts",
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@arcon/ai": "*",
-    "@arcon/memory": "*"
+    "@arcon/logger": "*",
+    "@arcon/memory": "*",
+    "@arcon/voice": "*"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

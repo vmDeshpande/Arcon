@@ -1,0 +1,21 @@
+{
+  "name": "@arcon/voice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test tests/**/*.test.ts"
+  },
+  "dependencies": {
+    "@arcon/shared": "0.1.0"
+  },
+  "devDependencies": {
+    "@arcon/logger": "0.1.0",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4"
+  }
+}

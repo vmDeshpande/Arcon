@@ -9,10 +9,10 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @arcon/shared && npm run build -w @arcon/logger && npm run build -w @arcon/memory && npm run build -w @arcon/personality && npm run build -w @arcon/ai && npm run build -w @arcon/cognition && npm run build -w @arcon/server",
+    "build": "npm run build -w @arcon/shared && npm run build -w @arcon/logger && npm run build -w @arcon/memory && npm run build -w @arcon/personality && npm run build -w @arcon/ai && npm run build -w @arcon/cognition && npm run build -w @arcon/voice && npm run build -w @arcon/server",
     "dev": "npm run dev -w @arcon/server",
     "start": "npm run start -w @arcon/server",
-    "typecheck": "npm run typecheck -w @arcon/shared && npm run typecheck -w @arcon/logger && npm run typecheck -w @arcon/memory && npm run typecheck -w @arcon/personality && npm run typecheck -w @arcon/ai && npm run typecheck -w @arcon/cognition && npm run typecheck -w @arcon/server",
+    "typecheck": "npm run typecheck -w @arcon/shared && npm run typecheck -w @arcon/logger && npm run typecheck -w @arcon/memory && npm run typecheck -w @arcon/personality && npm run typecheck -w @arcon/ai && npm run typecheck -w @arcon/cognition && npm run typecheck -w @arcon/voice && npm run typecheck -w @arcon/server",
     "chat": "npm run dev -w @arcon/chat"
   },
   "engines": {

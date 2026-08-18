@@ -19,3 +19,16 @@ The chat request path is:
 7. Server returns the reply.
 
 No long-term memory, personality system, screen awareness, automation, or proactive behavior exists in Phase 1.
+
+## Voice interface layer (packages/voice)
+
+Voice is an interface layer. It converts speech to text, routes the text through the **existing** Arcon processing path (`ChatService`, memory, personality), and speaks the reply back. It owns no memory, personality, reasoning, or LLM calls of its own.
+
+The request path for a voice turn is:
+
+1. `FFmpegMicrophoneRecorder` captures the microphone via `ffmpeg` (DirectShow on Windows).
+2. `WhisperSttRecognizer` transcribes to text using local `faster-whisper` (CPU).
+3. The transcript is passed to the existing `ChatService.chat`, which is the exact same path as text input.
+4. `WindowsSapiSynthesizer` (Windows) or `FfmpegFliteSynthesizer` speaks the reply to the speakers.
+
+The existing text path is unchanged.
