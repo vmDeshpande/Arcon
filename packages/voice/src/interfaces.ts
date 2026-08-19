@@ -1,5 +1,5 @@
 import type { Logger } from "@arcon/shared";
-import type { AudioDevice, AudioRecording, RecordOptions, Transcription } from "./types.js";
+import type { AudioDevice, AudioRecording, RecordOptions, Transcription, SynthChunk } from "./types.js";
 import type { VoiceError } from "./errors.js";
 
 export interface AudioRecorder {
@@ -17,15 +17,17 @@ export interface SpeechRecognizer {
 }
 
 export interface SpeechSynthesizer {
-	isAvailable(): Promise<boolean>;
-	prepare?(): Promise<void>;
-	speak(text: string, onFirstAudio?: () => void): Promise<void>;
-	stop(): Promise<void>;
+  isAvailable(): Promise<boolean>;
+  prepare?(): Promise<void>;
+  speak(text: string, onFirstAudio?: () => void): Promise<void>;
+  speakStream?(chunks: AsyncIterable<SynthChunk>, onFirstAudio?: () => void): Promise<void>;
+  stop(): Promise<void>;
 }
 
 export interface ArconChat {
-	chat(message: string): Promise<{ reply: string }>;
-	close(): void;
+  chat(message: string): Promise<{ reply: string }>;
+  chatStream?(message: string): AsyncIterable<string>;
+  close(): void;
 }
 
 export type VoiceTurnResult =
@@ -45,12 +47,13 @@ export interface VoiceEventCallbacks {
 }
 
 export interface VoiceTurnMetrics {
-	recordMs: number;
-	sttMs: number;
-	chatMs: number;
-	ttsMs: number;
-	timeToFirstAudioMs: number;
-	totalTurnMs: number;
+  recordMs: number;
+  sttMs: number;
+  chatMs: number;
+  ttsMs: number;
+  timeToFirstAudioMs: number;
+  totalTurnMs: number;
+  llmFirstTokenMs?: number;
 }
 
 export interface VoiceServiceOptions {

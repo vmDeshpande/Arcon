@@ -41,6 +41,7 @@ describe("SilenceDetector", () => {
 			silenceTimeoutMs: 100,
 			maxDurationMs: 5000,
 			frameMs: 50,
+			minSpeechMs: 0,
 		});
 
 		const loud = 0.5;
@@ -58,7 +59,7 @@ describe("SilenceDetector", () => {
 	});
 
 	it("stops at max duration even with continuous speech", () => {
-		const detector = new SilenceDetector({ threshold: 0.01, leadInMs: 0, silenceTimeoutMs: 500, maxDurationMs: 100, frameMs: 50 });
+		const detector = new SilenceDetector({ threshold: 0.01, leadInMs: 0, silenceTimeoutMs: 500, maxDurationMs: 100, frameMs: 50, minSpeechMs: 0 });
 		const r = detector.feed(0.5);
 		assert.equal(r.shouldStop, false);
 		const r2 = detector.feed(0.5);
@@ -66,9 +67,69 @@ describe("SilenceDetector", () => {
 	});
 
 	it("reports no speech when energy never crosses the threshold", () => {
-		const detector = new SilenceDetector({ threshold: 0.5, leadInMs: 0, silenceTimeoutMs: 100, maxDurationMs: 50, frameMs: 50 });
+		const detector = new SilenceDetector({ threshold: 0.5, leadInMs: 0, silenceTimeoutMs: 100, maxDurationMs: 50, frameMs: 50, minSpeechMs: 0 });
 		const r = detector.feed(0.1);
 		assert.equal(r.hasSpeech, false);
 		assert.equal(r.shouldStop, true);
+	});
+
+	it("enforces min speech duration before allowing silence stop", () => {
+		const detector = new SilenceDetector({
+			threshold: 0.01,
+			leadInMs: 0,
+			silenceTimeoutMs: 100,
+			maxDurationMs: 5000,
+			frameMs: 50,
+			minSpeechMs: 400,
+		});
+
+		const loud = 0.5;
+		const quiet = 0;
+
+		const r1 = detector.feed(loud);
+		assert.equal(r1.shouldStop, false);
+
+		const r2 = detector.feed(quiet);
+		assert.equal(r2.shouldStop, false);
+
+		const r3 = detector.feed(quiet);
+		assert.equal(r3.shouldStop, false);
+
+		const r4 = detector.feed(quiet);
+		assert.equal(r4.shouldStop, false);
+
+		const r5 = detector.feed(loud);
+		assert.equal(r5.shouldStop, false);
+
+		const r6 = detector.feed(quiet);
+		assert.equal(r6.shouldStop, false);
+
+		const r7 = detector.feed(quiet);
+		assert.equal(r7.shouldStop, false);
+
+		const r8 = detector.feed(quiet);
+		assert.equal(r8.shouldStop, true);
+	});
+
+	it("adapts threshold based on ambient noise", () => {
+		const detector = new SilenceDetector({
+			threshold: 0.01,
+			leadInMs: 200,
+			silenceTimeoutMs: 100,
+			maxDurationMs: 5000,
+			frameMs: 50,
+			minSpeechMs: 0,
+		});
+
+		const ambient = 0.05;
+		const loud = 0.3;
+
+		for (let i = 0; i < 4; i++) {
+			detector.feed(ambient);
+		}
+
+		const speechResult = detector.feed(loud);
+		assert.equal(speechResult.speaking, true);
+		assert.equal(speechResult.hasSpeech, true);
 	});
 });

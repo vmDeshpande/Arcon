@@ -32,6 +32,7 @@ export interface ConversationMemory {
 
 export interface AiClient {
   generateReply(messages: ChatMessage[]): Promise<string>;
+  generateReplyStream?(messages: ChatMessage[]): AsyncIterable<string>;
 }
 
 export const ArconEventType = {

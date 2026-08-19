@@ -1,15 +1,15 @@
 import type { Logger } from "@arcon/shared";
 import { VoiceError, type VoiceErrorCode } from "./errors.js";
-import type { AudioRecording, Transcription } from "./types.js";
+import type { AudioRecording, Transcription, SynthChunk } from "./types.js";
 import type {
-	ArconChat,
-	AudioRecorder,
-	SpeechRecognizer,
-	SpeechSynthesizer,
-	VoiceEventCallbacks,
-	VoiceServiceOptions,
-	VoiceTurnResult,
-	VoiceTurnMetrics,
+  ArconChat,
+  AudioRecorder,
+  SpeechRecognizer,
+  SpeechSynthesizer,
+  VoiceEventCallbacks,
+  VoiceServiceOptions,
+  VoiceTurnResult,
+  VoiceTurnMetrics,
 } from "./interfaces.js";
 
 export class VoiceService {
@@ -38,109 +38,211 @@ export class VoiceService {
 		}
 	}
 
-	async listenAndRespond(): Promise<VoiceTurnResult> {
-		if (this.closed) {
-			return { ok: false, reason: "CHAT_FAILURE", message: "Voice service is closed" };
-		}
+  async listenAndRespond(): Promise<VoiceTurnResult> {
+    if (this.closed) {
+      return { ok: false, reason: "CHAT_FAILURE", message: "Voice service is closed" };
+    }
 
-		const turnStart = now();
-		const marks = {
-			recordStart: turnStart,
-			recordEnd: turnStart,
-			sttStart: 0,
-			sttEnd: 0,
-			chatStart: 0,
-			chatEnd: 0,
-			ttsStart: 0,
-			playbackStart: 0,
-			end: turnStart,
-		};
+    const turnStart = now();
+    const marks = {
+      recordStart: turnStart,
+      recordEnd: turnStart,
+      sttStart: 0,
+      sttEnd: 0,
+      chatStart: 0,
+      firstTokenTime: 0,
+      chatEnd: 0,
+      ttsStart: 0,
+      playbackStart: 0,
+      end: turnStart,
+    };
 
-		const emitMetrics = () => {
-			marks.end = now();
-			const metrics: VoiceTurnMetrics = {
-				recordMs: marks.recordEnd - marks.recordStart,
-				sttMs: Math.max(0, marks.sttEnd - marks.sttStart),
-				chatMs: Math.max(0, marks.chatEnd - marks.chatStart),
-				ttsMs: Math.max(0, marks.end - marks.ttsStart),
-				timeToFirstAudioMs: marks.playbackStart
-					? marks.playbackStart - marks.recordEnd
-					: Math.max(0, marks.end - marks.recordEnd),
-				totalTurnMs: marks.end - turnStart,
-			};
-			this.callbacks.onTurnMetrics?.(metrics);
-		};
+    const emitMetrics = () => {
+      marks.end = now();
+      const metrics: VoiceTurnMetrics = {
+        recordMs: marks.recordEnd - marks.recordStart,
+        sttMs: Math.max(0, marks.sttEnd - marks.sttStart),
+        chatMs: Math.max(0, marks.chatEnd - marks.chatStart),
+        ttsMs: Math.max(0, marks.end - (marks.ttsStart > 0 ? marks.ttsStart : marks.playbackStart)),
+        timeToFirstAudioMs: marks.playbackStart
+          ? marks.playbackStart - marks.recordEnd
+          : Math.max(0, marks.end - marks.recordEnd),
+        totalTurnMs: marks.end - turnStart,
+        llmFirstTokenMs: marks.firstTokenTime ? marks.firstTokenTime - marks.chatStart : undefined,
+      };
+      this.callbacks.onTurnMetrics?.(metrics);
+    };
 
-		let recording: AudioRecording;
-		try {
-			marks.recordStart = now();
-			this.callbacks.onListening?.();
-			this.callbacks.onRecordingStarted?.();
-			recording = await this.options.recorder.record(this.options.recordOptions ?? {});
-			marks.recordEnd = now();
-			this.callbacks.onRecordingEnded?.();
-		} catch (error) {
-			const ve = this.toVoiceError(error, "MIC_UNAVAILABLE");
-			if (ve.code === "NO_SPEECH_DETECTED") {
-				this.callbacks.onSilence?.();
-				emitMetrics();
-				return { ok: false, reason: "NO_SPEECH_DETECTED", message: ve.message };
-			}
-			this.report(ve, "Capture failed");
-			emitMetrics();
-			return { ok: false, reason: ve.code, message: ve.message };
-		}
+    let recording: AudioRecording;
+    try {
+      marks.recordStart = now();
+      this.callbacks.onListening?.();
+      this.callbacks.onRecordingStarted?.();
+      recording = await this.options.recorder.record(this.options.recordOptions ?? {});
+      marks.recordEnd = now();
+      this.callbacks.onRecordingEnded?.();
+    } catch (error) {
+      const ve = this.toVoiceError(error, "MIC_UNAVAILABLE");
+      if (ve.code === "NO_SPEECH_DETECTED") {
+        this.callbacks.onSilence?.();
+        emitMetrics();
+        return { ok: false, reason: "NO_SPEECH_DETECTED", message: ve.message };
+      }
+      this.report(ve, "Capture failed");
+      emitMetrics();
+      return { ok: false, reason: ve.code, message: ve.message };
+    }
 
-		let transcript: Transcription;
-		try {
-			marks.sttStart = now();
-			transcript = await this.options.recognizer.transcribe(recording);
-			marks.sttEnd = now();
-		} catch (error) {
-			const ve = this.toVoiceError(error, "STT_FAILURE");
-			this.report(ve, "Speech recognition failed");
-			emitMetrics();
-			return { ok: false, reason: ve.code, message: ve.message };
-		}
+    let transcript: Transcription;
+    try {
+      marks.sttStart = now();
+      transcript = await this.options.recognizer.transcribe(recording);
+      marks.sttEnd = now();
+    } catch (error) {
+      const ve = this.toVoiceError(error, "STT_FAILURE");
+      this.report(ve, "Speech recognition failed");
+      emitMetrics();
+      return { ok: false, reason: ve.code, message: ve.message };
+    }
 
-		const text = transcript.text.trim();
-		this.callbacks.onTranscript?.(transcript);
-		if (!text) {
-			this.callbacks.onSilence?.();
-			emitMetrics();
-			return { ok: false, reason: "NO_SPEECH_DETECTED", message: "Transcription was empty" };
-		}
+    const text = transcript.text.trim();
+    this.callbacks.onTranscript?.(transcript);
+    if (!text) {
+      this.callbacks.onSilence?.();
+      emitMetrics();
+      return { ok: false, reason: "NO_SPEECH_DETECTED", message: "Transcription was empty" };
+    }
 
-		let reply: string;
-		try {
-			marks.chatStart = now();
-			reply = (await this.options.chat.chat(text)).reply;
-			marks.chatEnd = now();
-		} catch (error) {
-			const ve = this.toVoiceError(error, "CHAT_FAILURE");
-			this.report(ve, "Chat service failed");
-			emitMetrics();
-			return { ok: false, reason: ve.code, message: ve.message };
-		}
+    const canStream =
+      typeof this.options.chat.chatStream === "function" &&
+      typeof this.options.synthesizer.speakStream === "function";
 
-		this.callbacks.onReply?.(reply);
+    if (canStream) {
+      return this.streamTurn(text, marks, emitMetrics);
+    }
 
-		try {
-			marks.ttsStart = now();
-			this.callbacks.onSynthesizing?.();
-			await this.options.synthesizer.speak(reply, () => {
-				marks.playbackStart = now();
-			});
-		} catch (error) {
-			const ve = this.toVoiceError(error, "TTS_FAILURE");
-			this.report(ve, "Speech synthesis failed");
-			emitMetrics();
-			return { ok: false, reason: ve.code, message: ve.message };
-		}
+    return this.synchronousTurn(text, marks, emitMetrics);
+  }
 
-		emitMetrics();
-		return { ok: true, transcript: text, reply };
-	}
+  private async streamTurn(
+    text: string,
+    marks: {
+      chatStart: number;
+      firstTokenTime: number;
+      chatEnd: number;
+      ttsStart: number;
+      playbackStart: number;
+      end: number;
+    },
+    emitMetrics: () => void,
+  ): Promise<VoiceTurnResult> {
+    marks.chatStart = now();
+
+    this.callbacks.onSynthesizing?.();
+
+    let fullReply = "";
+    let ttsStarted = false;
+
+    const chatStream = this.options.chat.chatStream!;
+
+    async function* createSynthChunks(): AsyncIterable<SynthChunk> {
+      try {
+        for await (const token of chatStream(text)) {
+          fullReply += token;
+          if (!marks.firstTokenTime) {
+            marks.firstTokenTime = now();
+          }
+          yield { type: "token" as const, text: token };
+        }
+      } catch (error) {
+        fullReply = "";
+        yield {
+          type: "error" as const,
+          message: error instanceof Error ? error.message : String(error),
+        };
+        return;
+      }
+      yield { type: "done" };
+    }
+
+    try {
+      marks.ttsStart = now();
+
+      await this.options.synthesizer.speakStream!(
+        createSynthChunks(),
+        () => {
+          if (!ttsStarted) {
+            ttsStarted = true;
+            marks.playbackStart = now();
+          }
+        },
+      );
+      marks.chatEnd = now();
+    } catch (error) {
+      const ve = this.toVoiceError(error, "TTS_FAILURE");
+      this.report(ve, "Speech synthesis failed");
+      emitMetrics();
+      return { ok: false, reason: ve.code, message: ve.message };
+    }
+
+    if (!marks.firstTokenTime) {
+      marks.firstTokenTime = marks.ttsStart;
+    }
+    if (!marks.playbackStart) {
+      marks.playbackStart = marks.ttsStart;
+    }
+    if (!marks.chatEnd) {
+      marks.chatEnd = now();
+    }
+
+    this.callbacks.onReply?.(fullReply);
+
+    emitMetrics();
+    return { ok: true, transcript: text, reply: fullReply };
+  }
+
+  private async synchronousTurn(
+    text: string,
+    marks: {
+      chatStart: number;
+      firstTokenTime: number;
+      chatEnd: number;
+      ttsStart: number;
+      playbackStart: number;
+      end: number;
+    },
+    emitMetrics: () => void,
+  ): Promise<VoiceTurnResult> {
+    let reply: string;
+    try {
+      marks.chatStart = now();
+      reply = (await this.options.chat.chat(text)).reply;
+      marks.chatEnd = now();
+    } catch (error) {
+      const ve = this.toVoiceError(error, "CHAT_FAILURE");
+      this.report(ve, "Chat service failed");
+      emitMetrics();
+      return { ok: false, reason: ve.code, message: ve.message };
+    }
+
+    this.callbacks.onReply?.(reply);
+
+    try {
+      marks.ttsStart = now();
+      this.callbacks.onSynthesizing?.();
+      await this.options.synthesizer.speak(reply, () => {
+        marks.playbackStart = now();
+      });
+    } catch (error) {
+      const ve = this.toVoiceError(error, "TTS_FAILURE");
+      this.report(ve, "Speech synthesis failed");
+      emitMetrics();
+      return { ok: false, reason: ve.code, message: ve.message };
+    }
+
+    emitMetrics();
+    return { ok: true, transcript: text, reply };
+  }
 
 	async close(): Promise<void> {
 		this.closed = true;

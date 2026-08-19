@@ -99,7 +99,8 @@ export class FFmpegMicrophoneRecorder {
 			const detector = new SilenceDetector({
 				threshold: options.energyThreshold ?? 0.006,
 				leadInMs: options.leadInMs ?? 150,
-				silenceTimeoutMs: options.silenceTimeoutMs ?? 450,
+				silenceTimeoutMs: options.silenceTimeoutMs ?? 300,
+				minSpeechMs: options.minSpeechMs ?? 400,
 				maxDurationMs,
 				frameMs: 20,
 			});

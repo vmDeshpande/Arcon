@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { VoiceError } from "../errors.js";
 import { which } from "../util/exec.js";
 import { tryUnlink } from "../util/fs.js";
+import { SentenceBuffer } from "../audio/sentence-buffer.js";
+import type { SynthChunk } from "../types.js";
 
 const PIPER_WORKER_SCRIPT = `#!/usr/bin/env python
 import sys, os, json, time, wave
@@ -134,14 +136,126 @@ export class PiperTtsSynthesizer {
 			throw new VoiceError("TTS_FAILURE", "Piper TTS worker is not ready");
 		}
 
-		const stdin = this.worker.stdin;
+		const wavPath = await this.synthesizeToWav(text);
+		this.tempPaths.add(wavPath);
+
+		try {
+			await this.playWav(wavPath, onFirstAudio);
+		} finally {
+			tryUnlink(wavPath);
+			this.tempPaths.delete(wavPath);
+		}
+	}
+
+	async speakStream(chunks: AsyncIterable<SynthChunk>, onFirstAudio?: () => void): Promise<void> {
+		if (!this.worker || !this.ready) {
+			await this.prepare();
+		}
+
+		if (!this.worker || !this.ready) {
+			throw new VoiceError("TTS_FAILURE", "Piper TTS worker is not ready");
+		}
+
+		const sentenceBuffer = new SentenceBuffer();
+		const playbackQueue: { path: string; duration: number }[] = [];
+		let firstAudioCalled = false;
+		let playbackError: VoiceError | null = null;
+
+		let playbackResolver: (() => void) | null = null;
+		let playbackRejecter: ((err: VoiceError) => void) | null = null;
+		let playbackRunning = false;
+
+		const playNext = async (): Promise<void> => {
+			while (playbackQueue.length > 0) {
+				const item = playbackQueue.shift()!;
+				try {
+					await this.playWavQueued(item.path);
+				} catch (error) {
+					if (error instanceof VoiceError) {
+						playbackError = error;
+					} else {
+						playbackError = new VoiceError("AUDIO_PLAYBACK_FAILURE", "Audio playback failed", error);
+					}
+					break;
+				} finally {
+					tryUnlink(item.path);
+					this.tempPaths.delete(item.path);
+				}
+			}
+			playbackRunning = false;
+			if (playbackResolver) {
+				playbackResolver();
+				playbackResolver = null;
+				playbackRejecter = null;
+			}
+		};
+
+		const enqueuePlayback = (wavPath: string): void => {
+			this.tempPaths.add(wavPath);
+			if (!firstAudioCalled) {
+				firstAudioCalled = true;
+				onFirstAudio?.();
+			}
+			playbackQueue.push({ path: wavPath, duration: 0 });
+			if (!playbackRunning) {
+				playbackRunning = true;
+				playNext().catch(() => {});
+			}
+		};
+
+		try {
+			for await (const chunk of chunks) {
+				if (chunk.type === "error") {
+					throw new VoiceError("CHAT_FAILURE", chunk.message);
+				}
+				if (chunk.type === "done") {
+					break;
+				}
+
+				const sentences = sentenceBuffer.append(chunk.text);
+				for (const sentence of sentences) {
+					if (sentence.trim()) {
+						const wavPath = await this.synthesizeToWav(sentence);
+						this.tempPaths.add(wavPath);
+						enqueuePlayback(wavPath);
+					}
+				}
+			}
+
+			// Flush remaining buffered text
+			const remaining = sentenceBuffer.flush();
+			if (remaining) {
+				const wavPath = await this.synthesizeToWav(remaining);
+				this.tempPaths.add(wavPath);
+				enqueuePlayback(wavPath);
+			}
+
+			// Wait for all playback to finish
+			await new Promise<void>((resolve, reject) => {
+				playbackResolver = resolve;
+				playbackRejecter = reject;
+			});
+
+			if (playbackError) {
+				throw playbackError;
+			}
+		} catch (error) {
+			if (error instanceof VoiceError) {
+				throw error;
+			}
+			throw new VoiceError("TTS_FAILURE", "Streaming synthesis failed", error);
+		}
+	}
+
+	private async synthesizeToWav(text: string): Promise<string> {
+		const stdin = this.worker?.stdin;
 		if (!stdin || stdin.destroyed) {
 			throw new VoiceError("TTS_FAILURE", "Piper TTS worker stdin is unavailable");
 		}
 
 		stdin.write(JSON.stringify({ text }) + "\n");
 
-		const line = await readLine(this.worker, this.timeoutMs);
+		const line = await readLine(this.worker!, this.timeoutMs);
 		const payload = safeParseJson(line);
 		if (!payload) {
 			throw new VoiceError("TTS_FAILURE", `Malformed Piper response: ${line}`);
@@ -160,14 +274,34 @@ export class PiperTtsSynthesizer {
 			throw new VoiceError("AUDIO_PLAYBACK_FAILURE", "Piper did not produce an audio file");
 		}
 
-		this.tempPaths.add(wavPath);
+		return wavPath;
+	}
 
-		try {
-			await this.playWav(wavPath, onFirstAudio);
-		} finally {
-			tryUnlink(wavPath);
-			this.tempPaths.delete(wavPath);
-		}
+	private playWavQueued(wavPath: string): Promise<void> {
+		const child = spawn(this.ffplayPath, ["-nodisp", "-autoexit", "-loglevel", "quiet", "-i", wavPath], {
+			stdio: ["ignore", "ignore", "pipe"],
+		});
+
+		return new Promise<void>((resolve, reject) => {
+			const timer = setTimeout(() => {
+				terminate(child);
+				reject(new VoiceError("AUDIO_PLAYBACK_FAILURE", "Audio playback timed out"));
+			}, this.timeoutMs);
+
+			child.on("error", (error) => {
+				clearTimeout(timer);
+				reject(new VoiceError("AUDIO_PLAYBACK_FAILURE", "Failed to start audio playback", error));
+			});
+
+			child.on("close", (code) => {
+				clearTimeout(timer);
+				if (code === 0 || code === 1) {
+					resolve();
+				} else {
+					reject(new VoiceError("AUDIO_PLAYBACK_FAILURE", `Audio playback failed (exit ${code})`));
+				}
+			});
+		});
 	}
 
 	private async playWav(wavPath: string, onFirstAudio?: () => void): Promise<void> {

@@ -12,6 +12,7 @@ import type {
 	SpeechRecognizer,
 	SpeechSynthesizer,
 	Transcription,
+	SynthChunk,
 } from "../src/interfaces.js";
 
 function makeRecording(): AudioRecording {
@@ -292,5 +293,166 @@ describe("VoiceService", () => {
 		assert.equal(recognizer.startCalls, 1);
 		await service.close();
 		assert.equal(recognizer.stopCalls, 1);
+	});
+
+	it("uses streaming path when chatStream and speakStream are available", async () => {
+		const fakeChat: ArconChat = {
+			chat: async () => ({ reply: "fallback" }),
+			chatStream: async function* () {
+				yield "Hello";
+				yield " world.";
+			},
+			close: () => {},
+		};
+
+		const spokeChunks: string[] = [];
+
+		class StreamingSynthesizer implements SpeechSynthesizer {
+			async isAvailable() { return true; }
+			async speak(text: string) { spokeChunks.push(text); }
+			async speakStream(chunks: AsyncIterable<SynthChunk>) {
+				for await (const chunk of chunks) {
+					if (chunk.type === "token") {
+						spokeChunks.push(chunk.text);
+					}
+				}
+			}
+			async stop() {}
+		}
+
+		const service = new VoiceService({
+			recorder: new FakeRecorder(),
+			recognizer: new FakeRecognizer(),
+			synthesizer: new StreamingSynthesizer(),
+			chat: fakeChat,
+			events: {},
+		});
+
+		const result = await service.listenAndRespond();
+
+		assert.equal(result.ok, true);
+		if (result.ok) {
+			assert.equal(result.reply, "Hello world.");
+		}
+		assert.ok(spokeChunks.length > 0, "expected at least one chunk to be spoken");
+		assert.equal(typeof fakeChat.chat, "function");
+	});
+
+	it("passes raw streamed tokens to the synthesizer", async () => {
+		const tokens = ["Hello,", " how are", " you today?", " I hope", " you are well."];
+		const fakeChat: ArconChat = {
+			chat: async () => ({ reply: "fallback" }),
+			chatStream: async function* () {
+				for (const t of tokens) {
+					yield t;
+				}
+			},
+			close: () => {},
+		};
+
+		const receivedChunks: string[] = [];
+
+		class CapturingSynthesizer implements SpeechSynthesizer {
+			async isAvailable() { return true; }
+			async speak(_text: string) {}
+			async speakStream(chunks: AsyncIterable<SynthChunk>) {
+				for await (const chunk of chunks) {
+					if (chunk.type === "token") {
+						receivedChunks.push(chunk.text);
+					}
+				}
+			}
+			async stop() {}
+		}
+
+		const service = new VoiceService({
+			recorder: new FakeRecorder(),
+			recognizer: new FakeRecognizer(),
+			synthesizer: new CapturingSynthesizer(),
+			chat: fakeChat,
+			events: {},
+		});
+
+		await service.listenAndRespond();
+
+		assert.deepEqual(receivedChunks, tokens);
+	});
+
+	it("falls back to synchronous path when chatStream is missing", async () => {
+		const { service, synthesizer } = build();
+
+		const result = await service.listenAndRespond();
+
+		assert.equal(result.ok, true);
+		assert.equal(synthesizer.spoke.length, 1);
+	});
+
+	it("falls back to synchronous path when speakStream is missing", async () => {
+		class NoStreamSynthesizer implements SpeechSynthesizer {
+			spoke: string[] = [];
+			async isAvailable() { return true; }
+			async speak(text: string) { this.spoke.push(text); }
+			async stop() {}
+		}
+
+		const synth = new NoStreamSynthesizer();
+		const service = new VoiceService({
+			recorder: new FakeRecorder(),
+			recognizer: new FakeRecognizer(),
+			synthesizer: synth,
+			chat: new FakeChat(),
+			events: {},
+		});
+
+		const result = await service.listenAndRespond();
+
+		assert.equal(result.ok, true);
+		assert.equal(synth.spoke.length, 1);
+	});
+
+	it("handles streaming chat failure gracefully", async () => {
+		const failingChatStream = async function* (): AsyncIterable<string> {
+			throw new Error("LLM stream failed");
+		};
+
+		const fakeChat: ArconChat = {
+			chat: async () => ({ reply: "fallback" }),
+			chatStream: failingChatStream,
+			close: () => {},
+		};
+
+		class ErrorAwareSynthesizer implements SpeechSynthesizer {
+			async isAvailable() { return true; }
+			async speak(_text: string) {}
+			async speakStream(chunks: AsyncIterable<SynthChunk>) {
+				for await (const chunk of chunks) {
+					if (chunk.type === "error") {
+						throw new VoiceError("CHAT_FAILURE", chunk.message);
+					}
+				}
+			}
+			async stop() {}
+		}
+
+		const events: Record<string, unknown> = {};
+
+		const service = new VoiceService({
+			recorder: new FakeRecorder(),
+			recognizer: new FakeRecognizer(),
+			synthesizer: new ErrorAwareSynthesizer(),
+			chat: fakeChat,
+			events: {
+				onError: (error: VoiceError) => {
+					events.lastError = error;
+				},
+			},
+		});
+
+		const result = await service.listenAndRespond();
+
+		assert.equal(result.ok, false);
+		if (!result.ok) {
+			assert.equal(result.reason, "CHAT_FAILURE");
+		}
 	});
 });

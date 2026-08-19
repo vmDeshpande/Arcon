@@ -32,11 +32,12 @@ const logger = createLogger(resolve(root, "apps/chat/data/logs"));
 const debug = !!process.env.VOICE_DEBUG;
 
 const chat = {
-	chat: async (message: string) => {
-		const result = await chatService.chat(message);
-		return { reply: result.reply };
-	},
-	close: () => chatService.close(),
+  chat: async (message: string) => {
+    const result = await chatService.chat(message);
+    return { reply: result.reply };
+  },
+  chatStream: (message: string) => chatService.chatStream(message),
+  close: () => chatService.close(),
 };
 
 const voice = await createLocalVoiceService(chat, {

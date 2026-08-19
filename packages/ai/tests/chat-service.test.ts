@@ -28,6 +28,24 @@ class SequenceAiClient implements AiClient {
   }
 }
 
+class StreamingAiClient implements AiClient {
+  private chunks: string[];
+
+  constructor(chunks: string[]) {
+    this.chunks = chunks;
+  }
+
+  async generateReply(_messages: ChatMessage[]): Promise<string> {
+    return this.chunks.join("");
+  }
+
+  async *generateReplyStream(_messages: ChatMessage[]): AsyncIterable<string> {
+    for (const chunk of this.chunks) {
+      yield chunk;
+    }
+  }
+}
+
 function createService(
   responses: string[],
 ) {
@@ -199,6 +217,75 @@ describe("ChatService behavior state", () => {
     assert(!emotionResult.reply.toLowerCase().includes("do not have emotions"));
     assert(selfResult.reply.includes("I am Arcon."));
     assert(selfResult.reply.includes("memory"));
+
+    service.close();
+    repository.close();
+  });
+});
+
+function createStreamingService(chunks: string[]) {
+  const dir = mkdtempSync(join(tmpdir(), "arcon-chat-"));
+  const repository = new MemoryRepository(join(dir, "memories.sqlite"));
+  const pipeline = new MemoryPipeline(repository);
+  const moodDatabasePath = join(dir, "mood.sqlite");
+  const service = new ChatService(
+    repository,
+    pipeline,
+    new StreamingAiClient(chunks),
+    {
+      experienceDatabasePath: join(dir, "experiences.sqlite"),
+      moodDatabasePath,
+      entityDatabasePath: join(dir, "entities.sqlite"),
+    },
+  );
+
+  return { service, repository, moodDatabasePath };
+}
+
+describe("ChatService streaming", () => {
+  it("streams LLM response token chunks", async () => {
+    const { service } = createStreamingService(["Hello, ", "I am ", "Arcon."]);
+
+    const collected: string[] = [];
+    for await (const chunk of service.chatStream("Hello")) {
+      collected.push(chunk);
+    }
+
+    assert.equal(collected.join(""), "Hello, I am Arcon.");
+
+    service.close();
+  });
+
+  it("yields response immediately without waiting for memory extraction", async () => {
+    const { service, repository } = createStreamingService([
+      "Hi there, ",
+      "I remember ",
+      "what you said.",
+    ]);
+
+    const collected: string[] = [];
+    for await (const chunk of service.chatStream("I like building Arcon")) {
+      collected.push(chunk);
+    }
+
+    assert.equal(collected.join(""), "Hi there, I remember what you said.");
+
+    service.close();
+    repository.close();
+  });
+
+  it("yields recall replies as single chunks", async () => {
+    const { service, repository } = createStreamingService(["[]", "My name is TestUser."]);
+
+    await service.chat("My name is TestUser.");
+
+    const collected: string[] = [];
+    for await (const chunk of service.chatStream("What is my name?")) {
+      collected.push(chunk);
+    }
+
+    assert.ok(collected.length >= 1);
+    assert.ok(collected.join("").includes("TestUser"));
 
     service.close();
     repository.close();

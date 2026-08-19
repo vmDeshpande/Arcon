@@ -15,6 +15,19 @@ interface OllamaChatResponse {
     content: string;
   };
   error?: string;
+  done?: boolean;
+}
+
+interface OllamaStreamChunk {
+  model?: string;
+  created_at?: string;
+  message?: {
+    role: string;
+    content: string;
+  };
+  done?: boolean;
+  eval_count?: number;
+  eval_duration?: number;
 }
 
 export class OllamaClient implements AiClient {
@@ -58,6 +71,71 @@ export class OllamaClient implements AiClient {
     }
 
     return reply;
+  }
+
+  async *generateReplyStream(messages: ChatMessage[]): AsyncIterable<string> {
+    const response = await fetch(`${this.baseUrl}/api/chat`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: this.options.model,
+        stream: true,
+        messages: messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Ollama request failed (${response.status}): ${text}`);
+    }
+
+    if (!response.body) {
+      throw new Error("Ollama returned an empty response body");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        const text = decoder.decode(value, { stream: true });
+        const lines = text.split("\n").filter((line) => line.trim());
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            continue;
+          }
+
+          let chunk: OllamaStreamChunk;
+          try {
+            chunk = JSON.parse(line) as OllamaStreamChunk;
+          } catch {
+            continue;
+          }
+
+          if (chunk.done) {
+            break;
+          }
+
+          const content = chunk.message?.content;
+          if (content) {
+            yield content;
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 }
 

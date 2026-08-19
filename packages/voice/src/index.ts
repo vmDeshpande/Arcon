@@ -1,5 +1,5 @@
 export { VoiceError, type VoiceErrorCode } from "./errors.js";
-export type { Transcription, AudioRecording, AudioDevice, RecordOptions } from "./types.js";
+export type { Transcription, AudioRecording, AudioDevice, RecordOptions, SynthChunk } from "./types.js";
 export type {
 	AudioRecorder,
 	SpeechRecognizer,
@@ -17,6 +17,7 @@ export { FfmpegFliteSynthesizer, type FfmpegFliteSynthesizerOptions } from "./tt
 export { PiperTtsSynthesizer, type PiperTtsSynthesizerOptions } from "./tts/piper-tts-synthesizer.js";
 
 export { SilenceDetector, type FrameResult, type SilenceDetectorOptions } from "./audio/silence.js";
+export { SentenceBuffer } from "./audio/sentence-buffer.js";
 export { encodeWav, rmsOfPcm16, durationOfPcm16 } from "./audio/wav.js";
 
 export { VoiceService } from "./voice-service.js";
