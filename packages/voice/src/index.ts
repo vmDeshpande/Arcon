@@ -14,6 +14,7 @@ export { FFmpegMicrophoneRecorder, type FFmpegMicrophoneRecorderOptions } from "
 export { WhisperSttRecognizer, type WhisperSttRecognizerOptions } from "./stt/whisper-stt-recognizer.js";
 export { WindowsSapiSynthesizer, type WindowsSapiSynthesizerOptions } from "./tts/windows-sapi-synthesizer.js";
 export { FfmpegFliteSynthesizer, type FfmpegFliteSynthesizerOptions } from "./tts/ffmpeg-flite-synthesizer.js";
+export { PiperTtsSynthesizer, type PiperTtsSynthesizerOptions } from "./tts/piper-tts-synthesizer.js";
 
 export { SilenceDetector, type FrameResult, type SilenceDetectorOptions } from "./audio/silence.js";
 export { encodeWav, rmsOfPcm16, durationOfPcm16 } from "./audio/wav.js";

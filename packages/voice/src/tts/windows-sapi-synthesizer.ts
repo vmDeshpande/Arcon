@@ -57,7 +57,7 @@ export class WindowsSapiSynthesizer {
 		return this.scriptPath;
 	}
 
-	async speak(text: string): Promise<void> {
+	async speak(text: string, onFirstAudio?: () => void): Promise<void> {
 		if (!(await this.isAvailable())) {
 			throw new VoiceError("TTS_FAILURE", "Windows Speech API is not available on this platform");
 		}
@@ -71,6 +71,7 @@ export class WindowsSapiSynthesizer {
 			{ stdio: ["ignore", "ignore", "pipe"] },
 		);
 		this.active = child;
+		onFirstAudio?.();
 
 		let stderr = "";
 		child.stderr.on("data", (d) => (stderr += d.toString("utf8")));

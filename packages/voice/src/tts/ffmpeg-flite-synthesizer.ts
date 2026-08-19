@@ -32,7 +32,7 @@ export class FfmpegFliteSynthesizer {
 		return /[\s\ns]flite\s/.test(stdout);
 	}
 
-	async speak(text: string): Promise<void> {
+	async speak(text: string, onFirstAudio?: () => void): Promise<void> {
 		const wavPath = makeTempPath("wav");
 		const filtergraph = `flite=text=${escapeFiltergraphValue(text)}`;
 
@@ -65,6 +65,7 @@ export class FfmpegFliteSynthesizer {
 		this.active = spawn(this.ffplayPath, ["-nodisp", "-autoexit", "-loglevel", "quiet", "-i", wavPath], {
 			stdio: ["ignore", "ignore", "pipe"],
 		});
+		onFirstAudio?.();
 
 		await new Promise<void>((resolve, reject) => {
 			const timer = setTimeout(() => {

@@ -29,6 +29,8 @@ const chatService = new ChatService(repository, pipeline, aiClient, {
 
 const logger = createLogger(resolve(root, "apps/chat/data/logs"));
 
+const debug = !!process.env.VOICE_DEBUG;
+
 const chat = {
 	chat: async (message: string) => {
 		const result = await chatService.chat(message);
@@ -37,7 +39,28 @@ const chat = {
 	close: () => chatService.close(),
 };
 
-const voice = await createLocalVoiceService(chat, { logger });
+const voice = await createLocalVoiceService(chat, {
+	logger,
+	environment: {
+		tts: "auto",
+		ttsModel: process.env.PIPER_VOICE_MODEL,
+	},
+	events: {
+		onListening: () => debug && console.log("[voice] listening"),
+		onRecordingStarted: () => debug && console.log("[voice] recording"),
+		onRecordingEnded: () => debug && console.log("[voice] stopped speaking"),
+		onTranscript: (t) => debug && console.log("[voice] transcript:", t.text),
+		onReply: (r) => debug && console.log("[voice] reply:", r),
+		onSynthesizing: () => debug && console.log("[voice] synthesizing..."),
+		onSilence: () => debug && console.log("[voice] (no speech detected)"),
+		onError: (error) => console.error("[voice]", error.code, error.message),
+		onTurnMetrics: (m) =>
+			debug &&
+			console.error(
+				`[voice] metrics ms  record=${m.recordMs} stt=${m.sttMs} chat=${m.chatMs} tts=${m.ttsMs} toFirstAudio=${m.timeToFirstAudioMs} total=${m.totalTurnMs}`,
+			),
+	},
+});
 
 const rl = readline.createInterface({ input: stdin, output: stdout });
 
@@ -49,7 +72,9 @@ console.log("=================================");
 console.log("");
 
 await voice.start();
-console.log("Speech recognition warmed up. Press ENTER to speak, or type 'exit' to quit.");
+console.log("Speech recognition + TTS warmed up. Press ENTER to speak, or type 'exit' to quit.");
+console.log(debug ? "Latency metrics enabled (VOICE_DEBUG)." : "Set VOICE_DEBUG=1 to see per-stage latency metrics.");
+console.log(process.env.PIPER_VOICE_MODEL ? `Piper voice model: ${process.env.PIPER_VOICE_MODEL}` : "Using default Piper neural voice (set PIPER_VOICE_MODEL to override).");
 
 while (true) {
 	const command = (await rl.question("You (ENTER to speak): ")).trim();

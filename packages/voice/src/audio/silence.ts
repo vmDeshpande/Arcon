@@ -23,8 +23,8 @@ export class SilenceDetector {
 	constructor(options: Partial<SilenceDetectorOptions> = {}) {
 		this.options = {
 			threshold: options.threshold ?? 0.006,
-			leadInMs: options.leadInMs ?? 300,
-			silenceTimeoutMs: options.silenceTimeoutMs ?? 800,
+			leadInMs: options.leadInMs ?? 150,
+			silenceTimeoutMs: options.silenceTimeoutMs ?? 450,
 			maxDurationMs: options.maxDurationMs ?? 15000,
 			frameMs: options.frameMs ?? 20,
 		};

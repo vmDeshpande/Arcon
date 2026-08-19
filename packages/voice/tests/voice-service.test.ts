@@ -108,7 +108,7 @@ function build() {
 		recognizer,
 		synthesizer,
 		chat,
-		events: {
+  events: {
 			onListening: () => {},
 			onRecordingStarted: () => {},
 			onTranscript: () => {},
@@ -117,6 +117,9 @@ function build() {
 			onSilence: () => {},
 			onError: (error: VoiceError) => {
 				events.lastError = error;
+			},
+			onTurnMetrics: (metrics) => {
+				events.metrics = metrics;
 			},
 		},
 	});
@@ -251,6 +254,36 @@ describe("VoiceService", () => {
 		}
 		assert.equal(chat.received.length, 2);
 		assert.equal(synthesizer.spoke.length, 2);
+	});
+
+	it("reports per-turn latency metrics on success", async () => {
+		const { service, events } = build();
+
+		await service.listenAndRespond();
+
+		const m = events.metrics as
+			| { recordMs: number; sttMs: number; chatMs: number; ttsMs: number; timeToFirstAudioMs: number; totalTurnMs: number }
+			| null;
+		assert.ok(m, "expected onTurnMetrics to be called");
+		assert.equal(typeof m!.recordMs, "number");
+		assert.equal(typeof m!.sttMs, "number");
+		assert.equal(typeof m!.chatMs, "number");
+		assert.equal(typeof m!.ttsMs, "number");
+		assert.equal(typeof m!.timeToFirstAudioMs, "number");
+		assert.equal(typeof m!.totalTurnMs, "number");
+		assert.equal(m!.totalTurnMs, m!.recordMs + m!.sttMs + m!.chatMs + m!.ttsMs);
+	});
+
+	it("still emits metrics on a failed turn", async () => {
+		const { service, recognizer, events } = build();
+		recognizer.thrownError = new VoiceError("STT_FAILURE", "model crashed");
+
+		const result = await service.listenAndRespond();
+
+		assert.equal(result.ok, false);
+		const m = events.metrics as { totalTurnMs: number } | null;
+		assert.ok(m, "expected onTurnMetrics even on failure");
+		assert.equal(typeof m!.totalTurnMs, "number");
 	});
 
 	it("warms up and tears down the recognizer", async () => {
