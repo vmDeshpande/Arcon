@@ -1,7 +1,8 @@
-import { Decision } from "../models/decision";
-import { ReplyStrategy } from "../models/strategy";
-import { ThoughtContext } from "../models/context";
-import { IntentResult } from "../plugins/intent/intent-result";
+import { Decision } from "../models/decision.js";
+import { ReplyStrategy } from "../models/strategy.js";
+import { ResponseStrategy } from "../types/enums.js";
+import { ThoughtContext } from "../models/context.js";
+import { IntentResult } from "../plugins/intent/intent-result.js";
 
 /**
  * A Thought represents one complete cognitive cycle.
@@ -38,9 +39,19 @@ export interface Thought {
   intent?: IntentResult;
 
   /**
-   * Reply strategy.
+   * Reply style guidance.
    */
   strategy: ReplyStrategy;
+
+  /**
+   * High-level response strategy selected by cognition.
+   */
+  responseStrategy?: ResponseStrategy;
+
+  /**
+   * Human-readable reason for the selected strategy.
+   */
+  strategyReason?: string;
 
   /**
    * Debug metadata.
@@ -50,6 +61,8 @@ export interface Thought {
 
 export interface ThoughtMetadata {
   durationMs?: number;
-
   pipelineVersion: number;
+  tone?: string;
+  relevantConversationCount?: number;
+  conversationHistoryLength?: number;
 }

@@ -1,4 +1,4 @@
-import { CognitivePlugin } from "./cognitive-plugin";
+import { CognitivePlugin } from "./cognitive-plugin.js";
 
 export class PluginRegistry {
   private readonly plugins: CognitivePlugin[] = [];

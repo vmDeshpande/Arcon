@@ -12,7 +12,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test tests/**/*.test.ts"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@arcon/memory": "*"
+  },
   "devDependencies": {
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"

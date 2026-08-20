@@ -1,6 +1,6 @@
-import { Thought } from "./thought";
+import { Thought } from "./thought.js";
 
-import { DecisionType, ConfidenceLevel, ReplyStyle } from "../types/enums";
+import { DecisionType, ConfidenceLevel, ReplyStyle } from "../types/enums.js";
 
 export class ThoughtBuilder {
   build(message: string): Thought {

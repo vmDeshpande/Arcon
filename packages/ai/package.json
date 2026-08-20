@@ -13,7 +13,8 @@
   "dependencies": {
     "@arcon/shared": "*",
     "@arcon/memory": "*",
-    "@arcon/personality": "*"
+    "@arcon/personality": "*",
+    "@arcon/cognition": "*"
   },
   "devDependencies": {
     "typescript": "^5.5.4"

@@ -1,6 +1,6 @@
-import { CognitivePlugin } from "../../pipeline/cognitive-plugin";
-import { Thought } from "../../thought/thought";
-import { IntentAnalyzer } from "./intent-analyzer";
+import { CognitivePlugin } from "../../pipeline/cognitive-plugin.js";
+import { Thought } from "../../thought/thought.js";
+import { IntentAnalyzer } from "./intent-analyzer.js";
 
 export class IntentPlugin implements CognitivePlugin {
   readonly id = "intent";
@@ -9,7 +9,7 @@ export class IntentPlugin implements CognitivePlugin {
 
   private readonly analyzer = new IntentAnalyzer();
 
-  shouldRun(): boolean {
+  shouldRun(_thought: Thought): boolean {
     return true;
   }
 

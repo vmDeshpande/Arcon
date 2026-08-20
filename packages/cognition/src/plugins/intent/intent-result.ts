@@ -1,7 +1,7 @@
 import {
   RequestComplexity,
   UserGoal,
-} from "./intent-types";
+} from "./intent-types.js";
 
 export interface IntentResult {
   goal: UserGoal;

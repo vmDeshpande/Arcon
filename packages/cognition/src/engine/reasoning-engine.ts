@@ -1,8 +1,8 @@
-import { PluginRegistry } from "../pipeline/plugin-registry";
-import { ReasoningPipeline } from "../pipeline/reasoning-pipeline";
-import { ThoughtBuilder } from "../thought/thought-builder";
-import { Thought } from "../thought/thought";
-import { IntentPlugin } from "../plugins/intent/intent-plugin";
+import { PluginRegistry } from "../pipeline/plugin-registry.js";
+import { ReasoningPipeline } from "../pipeline/reasoning-pipeline.js";
+import { ThoughtBuilder } from "../thought/thought-builder.js";
+import { Thought } from "../thought/thought.js";
+import { IntentPlugin } from "../plugins/intent/intent-plugin.js";
 
 export class ReasoningEngine {
   private readonly builder = new ThoughtBuilder();

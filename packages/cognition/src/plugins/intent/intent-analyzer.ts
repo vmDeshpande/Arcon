@@ -1,8 +1,8 @@
-import { IntentResult } from "./intent-result";
+import { IntentResult } from "./intent-result.js";
 import {
   RequestComplexity,
   UserGoal,
-} from "./intent-types";
+} from "./intent-types.js";
 
 export class IntentAnalyzer {
   analyze(message: string): IntentResult {

@@ -41,6 +41,93 @@ export class EmotionManager extends EmotionEngine {
     this.setPendingQuestion(false);
   }
 
+  recordAssistantTurn(
+    message: string,
+    context: {
+      strategy?: string;
+      intent?: string;
+      arconInterests: { topic: string; weight: number }[];
+    } = { arconInterests: [] },
+  ): void {
+    const emotions = this.getCurrentEmotions();
+    const lower = message.toLowerCase();
+    const strategy = (context.strategy ?? "").toLowerCase();
+    const intent = context.intent ?? "";
+
+    let happinessDelta = 0;
+    let frustrationDelta = 0;
+    let curiosityDelta = 0;
+    let trustDelta = 0;
+    let confidenceDelta = 0;
+
+    const askedQuestion = /\?\s*$/.test(message.trim()) || /\?/.test(message);
+
+    if (askedQuestion) {
+      curiosityDelta += 0.04;
+      confidenceDelta += 0.02;
+    }
+
+    if (/\b(you're welcome|happy to help|glad to help|no problem)\b/.test(lower)) {
+      trustDelta += 0.03;
+      happinessDelta += 0.02;
+    }
+
+    if (/\b(congratulations|congrats|awesome|amazing|fantastic|incredible|nice|well done)\b/.test(lower)) {
+      happinessDelta += 0.1;
+      trustDelta += 0.04;
+    }
+
+    if (/\b(sorry to hear|that sounds|rough|frustrating|tough|difficult)\b/.test(lower)) {
+      trustDelta += 0.05;
+      confidenceDelta += 0.02;
+      happinessDelta += 0.01;
+    }
+
+    if (/\b(let's|we should|we can|we'll|we are|we're)\b/.test(lower)) {
+      trustDelta += 0.03;
+      confidenceDelta += 0.02;
+    }
+
+    if (/\b(i think|i believe|in my experience|based on)\b/.test(lower)) {
+      confidenceDelta += 0.03;
+    }
+
+    if (context.arconInterests.some((interest) => {
+      const topic = interest.topic.toLowerCase();
+      const keywords = topic.split(/\s+/);
+      return keywords.some((keyword) => keyword.length > 3 && lower.includes(keyword));
+    })) {
+      curiosityDelta += 0.05;
+      happinessDelta += 0.03;
+    }
+
+    if (strategy.includes("comfort") || intent === "comfort") {
+      trustDelta += 0.05;
+      confidenceDelta += 0.02;
+      happinessDelta += 0.02;
+    } else if (strategy.includes("celebrate") || intent === "celebrate") {
+      happinessDelta += 0.1;
+      trustDelta += 0.03;
+    } else if (strategy.includes("encourage") || intent === "encourage") {
+      happinessDelta += 0.06;
+      confidenceDelta += 0.04;
+    } else if (strategy.includes("explore") || intent === "explore") {
+      curiosityDelta += 0.05;
+      confidenceDelta += 0.02;
+    }
+
+    if (happinessDelta !== 0 || frustrationDelta !== 0 || curiosityDelta !== 0 ||
+        trustDelta !== 0 || confidenceDelta !== 0) {
+      this.saveEmotionState({
+        happiness: this.clampEmotion(emotions.happiness + happinessDelta),
+        frustration: this.clampEmotion(emotions.frustration + frustrationDelta),
+        curiosity: this.clampEmotion(emotions.curiosity + curiosityDelta),
+        trust: this.clampEmotion(emotions.trust + trustDelta),
+        confidence: this.clampEmotion(emotions.confidence + confidenceDelta),
+      });
+    }
+  }
+
   recordUserTurn(message: string): void {
     const pending = this.getPendingQuestion();
     const engaged = this.isPositiveEngagement(message);

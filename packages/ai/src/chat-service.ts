@@ -12,6 +12,7 @@ import {
   EntityFactRepository,
   EntityKnowledgeBuilder,
   ConversationEntityTracker,
+  ConversationStore,
 } from "@arcon/memory";
 import type { MemoryCandidate } from "@arcon/memory";
 import type { AiClient, ChatMessage } from "@arcon/shared";
@@ -34,7 +35,10 @@ import { IdentityRecall } from "./reasoning/identity-recall.js";
 import { ProjectRecall } from "./reasoning/project-recall.js";
 import { RelationshipRecall } from "./reasoning/relationship-recall.js";
 import { classifyExperience } from "./experience/experience-classifier.js";
+import { classifyArconExperience } from "./experience/arcon-experience-classifier.js";
 import { LlmMemoryExtractor } from "./semantic-memory/index.js";
+import { ConversationContext } from "./conversation-context.js";
+import { CognitiveAdapter, CognitiveInput, CognitiveResult } from "./cognitive-adapter.js";
 
 export interface ChatResult {
   prompt: string;
@@ -45,6 +49,7 @@ export interface ChatServiceOptions {
   experienceDatabasePath?: string;
   moodDatabasePath?: string;
   entityDatabasePath?: string;
+  conversationDatabasePath?: string;
 }
 
 export class ChatService {
@@ -58,6 +63,9 @@ export class ChatService {
   private readonly knowledgeBuilder: EntityKnowledgeBuilder;
   private readonly conversationTracker: ConversationEntityTracker;
   private readonly moodRepository: MoodRepository;
+  private readonly conversationContext: ConversationContext;
+  private readonly conversationStore: ConversationStore;
+  private readonly cognitiveAdapter: CognitiveAdapter;
   private lastEmotionTimestamp: number;
 
   constructor(
@@ -69,6 +77,7 @@ export class ChatService {
       },
     },
     options: ChatServiceOptions = {},
+    private readonly conversationId: string = crypto.randomUUID(),
   ) {
     const experienceRepository = new ExperienceRepository(
       options.experienceDatabasePath ?? "./data/experiences.sqlite",
@@ -104,9 +113,32 @@ export class ChatService {
     this.conversationTracker = new ConversationEntityTracker(
       this.entityRepository,
     );
+
+    this.conversationContext = new ConversationContext();
+    this.conversationStore = new ConversationStore(
+      options.conversationDatabasePath ?? "./apps/chat/data/conversations.sqlite",
+    );
+    this.conversationStore.createConversation({ id: this.conversationId });
+
+    this.cognitiveAdapter = new CognitiveAdapter(
+      this.emotionEngine,
+      this.moodEngine,
+      this.interestEngine,
+      this.experiences,
+      new MemoryRetriever(this.repository, this.entityRepository, this.factRepository),
+      this.entityRepository,
+      this.conversationTracker,
+    );
   }
 
   async chat(message: string): Promise<ChatResult> {
+    this.conversationContext.addUserMessage(this.conversationId, message);
+    this.conversationStore.storeMessage({
+      conversationId: this.conversationId,
+      role: "user",
+      content: message,
+    });
+
     const now = Date.now();
     const elapsed = now - this.lastEmotionTimestamp;
 
@@ -292,33 +324,72 @@ export class ChatService {
 
     let memoryContext = "";
 
+    const retriever = new MemoryRetriever(
+      this.repository,
+      this.entityRepository,
+      this.factRepository,
+    );
+
+    const memories = retriever.retrieveRelevantMemories(resolvedMessage);
+
     if (intent === IntentType.USER_PROFILE) {
       memoryContext = buildUserProfile(this.repository);
     } else if (intent === IntentType.ARCON_IDENTITY) {
       memoryContext = "";
     } else {
-      const retriever = new MemoryRetriever(
-        this.repository,
-        this.entityRepository,
-        this.factRepository,
-      );
-
-      const memories = retriever.retrieveRelevantMemories(resolvedMessage);
-
       const userProfile = buildUserProfile(this.repository);
-
       const relevantMemories = buildMemoryContext(memories);
-
       memoryContext = [userProfile, "", relevantMemories]
         .filter(Boolean)
         .join("\n");
     }
 
+    const conversationHistory = this.conversationContext.toPromptLines(this.conversationId);
+
+    const relevantConversationHistory = this.conversationStore.getRelevantConversationHistory(resolvedMessage, 2);
+
+    const cognitiveInput: CognitiveInput = {
+      message: resolvedMessage,
+      intent,
+      emotions,
+      moodLabel,
+      mood: {
+        frustration: moodState.frustration,
+        askCount: moodState.askCount,
+        pendingQuestion: moodState.pendingQuestion,
+        trust: moodState.trust,
+        excitement: moodState.excitement,
+      },
+      interests,
+      arconInterests,
+      activeEntity: activeEntity ? { name: activeEntity.name, type: activeEntity.type } : null,
+      recentMemories: memories
+        .slice(0, 5)
+        .map((m) => ({ id: m.id, content: m.content })),
+      recentExperiences: this.experiences.list().slice(0, 5).map((e) => e.type),
+      conversationHistory,
+      relevantConversations: relevantConversationHistory.map((entry) => ({
+        conversationId: entry.conversation.id,
+        messages: entry.messages.slice(-6).map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      })),
+    };
+
+    const cognitiveResult = await this.cognitiveAdapter.process(cognitiveInput);
+
     const prompt = new PromptBuilder().build({
       systemPrompt,
       memoryContext,
-      conversationHistory: [],
+      conversationHistory,
       userMessage: resolvedMessage,
+      strategy: {
+        responseStrategy: cognitiveResult.strategy,
+        reason: cognitiveResult.strategyReason,
+        tone: cognitiveResult.tone,
+      },
+      relevantConversations: cognitiveInput.relevantConversations,
     });
 
     const messages: ChatMessage[] = [
@@ -334,6 +405,36 @@ export class ChatService {
 
     this.moodEngine.recordAssistantReply(reply);
     this.emotionEngine.recordAssistantReply(reply);
+    this.conversationContext.addAssistantMessage(this.conversationId, reply);
+
+    const arconExperience = classifyArconExperience(
+      reply,
+      cognitiveResult.strategy,
+      intent,
+    );
+
+    if (arconExperience) {
+      this.experiences.record(arconExperience);
+      this.emotionEngine.updateOnEvent(arconExperience, reply);
+    }
+
+    this.emotionEngine.recordAssistantTurn(reply, {
+      strategy: cognitiveResult.strategy,
+      intent,
+      arconInterests,
+    });
+
+    this.interestEngine.updateFromText(reply);
+    this.interestEngine.updateArconFromText(
+      reply,
+      this.emotionEngine.getCurrentEmotions(),
+    );
+
+    this.conversationStore.storeMessage({
+      conversationId: this.conversationId,
+      role: "assistant",
+      content: reply,
+    });
 
     return {
       prompt,
@@ -342,6 +443,13 @@ export class ChatService {
   }
 
   async *chatStream(message: string): AsyncIterable<string> {
+    this.conversationContext.addUserMessage(this.conversationId, message);
+    this.conversationStore.storeMessage({
+      conversationId: this.conversationId,
+      role: "user",
+      content: message,
+    });
+
     const now = Date.now();
     const elapsed = now - this.lastEmotionTimestamp;
 
@@ -455,33 +563,72 @@ export class ChatService {
 
     let memoryContext = "";
 
+    const retriever = new MemoryRetriever(
+      this.repository,
+      this.entityRepository,
+      this.factRepository,
+    );
+
+    const memories = retriever.retrieveRelevantMemories(resolvedMessage);
+
     if (intent === IntentType.USER_PROFILE) {
       memoryContext = buildUserProfile(this.repository);
     } else if (intent === IntentType.ARCON_IDENTITY) {
       memoryContext = "";
     } else {
-      const retriever = new MemoryRetriever(
-        this.repository,
-        this.entityRepository,
-        this.factRepository,
-      );
-
-      const memories = retriever.retrieveRelevantMemories(resolvedMessage);
-
       const userProfile = buildUserProfile(this.repository);
-
       const relevantMemories = buildMemoryContext(memories);
-
       memoryContext = [userProfile, "", relevantMemories]
         .filter(Boolean)
         .join("\n");
     }
 
+    const conversationHistory = this.conversationContext.toPromptLines(this.conversationId);
+
+    const relevantConversationHistory = this.conversationStore.getRelevantConversationHistory(resolvedMessage, 2);
+
+    const cognitiveInput: CognitiveInput = {
+      message: resolvedMessage,
+      intent,
+      emotions,
+      moodLabel,
+      mood: {
+        frustration: moodState.frustration,
+        askCount: moodState.askCount,
+        pendingQuestion: moodState.pendingQuestion,
+        trust: moodState.trust,
+        excitement: moodState.excitement,
+      },
+      interests,
+      arconInterests,
+      activeEntity: activeEntity ? { name: activeEntity.name, type: activeEntity.type } : null,
+      recentMemories: memories
+        .slice(0, 5)
+        .map((m) => ({ id: m.id, content: m.content })),
+      recentExperiences: this.experiences.list().slice(0, 5).map((e) => e.type),
+      conversationHistory,
+      relevantConversations: relevantConversationHistory.map((entry) => ({
+        conversationId: entry.conversation.id,
+        messages: entry.messages.slice(-6).map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      })),
+    };
+
+    const cognitiveResult = await this.cognitiveAdapter.process(cognitiveInput);
+
     const prompt = new PromptBuilder().build({
       systemPrompt,
       memoryContext,
-      conversationHistory: [],
+      conversationHistory,
       userMessage: resolvedMessage,
+      strategy: {
+        responseStrategy: cognitiveResult.strategy,
+        reason: cognitiveResult.strategyReason,
+        tone: cognitiveResult.tone,
+      },
+      relevantConversations: cognitiveInput.relevantConversations,
     });
 
     const messages: ChatMessage[] = [
@@ -508,6 +655,36 @@ export class ChatService {
 
     this.moodEngine.recordAssistantReply(fullReply);
     this.emotionEngine.recordAssistantReply(fullReply);
+    this.conversationContext.addAssistantMessage(this.conversationId, fullReply);
+
+    const arconExperience = classifyArconExperience(
+      fullReply,
+      cognitiveResult.strategy,
+      intent,
+    );
+
+    if (arconExperience) {
+      this.experiences.record(arconExperience);
+      this.emotionEngine.updateOnEvent(arconExperience, fullReply);
+    }
+
+    this.emotionEngine.recordAssistantTurn(fullReply, {
+      strategy: cognitiveResult.strategy,
+      intent,
+      arconInterests,
+    });
+
+    this.interestEngine.updateFromText(fullReply);
+    this.interestEngine.updateArconFromText(
+      fullReply,
+      this.emotionEngine.getCurrentEmotions(),
+    );
+
+    this.conversationStore.storeMessage({
+      conversationId: this.conversationId,
+      role: "assistant",
+      content: fullReply,
+    });
 
     // Await the deferred memory extraction + processing now.
     // This does not block the response (it already completed above), but ensures
@@ -555,5 +732,6 @@ export class ChatService {
   close(): void {
     this.entityRepository.close();
     this.moodRepository.close();
+    this.conversationStore.close();
   }
 }

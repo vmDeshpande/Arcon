@@ -1,4 +1,4 @@
-import { ConfidenceLevel, DecisionType } from "../types/enums";
+import { ConfidenceLevel, DecisionType } from "../types/enums.js";
 
 export interface Decision {
   type: DecisionType;

@@ -1,4 +1,4 @@
-import { ReplyStyle } from "../types/enums";
+import { ReplyStyle } from "../types/enums.js";
 
 export interface ReplyStrategy {
   style: ReplyStyle;

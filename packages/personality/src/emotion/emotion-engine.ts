@@ -87,6 +87,36 @@ const EVENT_IMPACT: Partial<Record<ExperienceType, Partial<Emotions>>> = {
     trust: 0.1,
     confidence: 0.05,
   },
+  [ExperienceType.ARCON_ASKED_QUESTION]: {
+    curiosity: 0.04,
+    confidence: 0.02,
+  },
+  [ExperienceType.ARCON_HELPED_USER]: {
+    happiness: 0.1,
+    confidence: 0.08,
+    trust: 0.05,
+  },
+  [ExperienceType.ARCON_DISCUSSED_INTEREST]: {
+    happiness: 0.08,
+    curiosity: 0.06,
+  },
+  [ExperienceType.ARCON_PROVIDED_ANSWER]: {
+    confidence: 0.06,
+    trust: 0.03,
+  },
+  [ExperienceType.ARCON_ACKNOWLEDGED_USER]: {
+    trust: 0.04,
+    happiness: 0.02,
+  },
+  [ExperienceType.ARCON_CELEBRATED_WITH_USER]: {
+    happiness: 0.12,
+    trust: 0.04,
+  },
+  [ExperienceType.ARCON_COMFORTED_USER]: {
+    trust: 0.05,
+    confidence: 0.03,
+    happiness: 0.02,
+  },
 };
 
 const DECAY_RATE_PER_MILLISECOND: Record<keyof Emotions, number> = {

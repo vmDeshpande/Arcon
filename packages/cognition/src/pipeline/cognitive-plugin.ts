@@ -1,4 +1,4 @@
-import { Thought } from "../thought/thought";
+import { Thought } from "../thought/thought.js";
 
 export interface CognitivePlugin {
   /**

@@ -1,8 +1,11 @@
 import type { AiClient, ChatMessage } from "@arcon/shared";
 export * from "./prompt-builder.js";
 export * from "./chat-service.js";
+export * from "./conversation-context.js";
+export * from "./cognitive-adapter.js";
 export * from "./context/intent-classifier.js";
 export * from "./reasoning/index.js";
+export * from "./experience/arcon-experience-classifier.js";
 
 export interface OllamaClientOptions {
   baseUrl: string;

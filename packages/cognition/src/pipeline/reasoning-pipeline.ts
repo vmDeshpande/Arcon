@@ -1,5 +1,5 @@
-import { Thought } from "../thought/thought";
-import { CognitivePlugin } from "./cognitive-plugin";
+import { Thought } from "../thought/thought.js";
+import { CognitivePlugin } from "./cognitive-plugin.js";
 
 export class ReasoningPipeline {
   constructor(
