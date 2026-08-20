@@ -6,24 +6,33 @@ import { join } from "node:path";
 
 import {
   DEFAULT_PERSONALITY,
+  EmotionEngine,
   EmotionManager,
   PersonalityManager,
   buildBehaviorPrompt,
+  MoodEngine,
+  MoodRepository,
 } from "../src/index.js";
 import { MemoryRepository } from "@arcon/memory";
 
 function createMoodEngine() {
   const dir = mkdtempSync(join(tmpdir(), "arcon-mood-"));
-  const repository = new MemoryRepository(join(dir, "personal-memory.sqlite"));
+  const memoryRepo = new MemoryRepository(join(dir, "personal-memory.sqlite"));
+  const moodRepo = new MoodRepository(join(dir, "mood.sqlite"));
+  const emotionEngine = new EmotionEngine(memoryRepo, { getCount: () => 0, record: () => {} } as any);
+  const moodEngine = new MoodEngine(moodRepo, emotionEngine);
+  const emotionManager = new EmotionManager(memoryRepo, { getCount: () => 0, record: () => {} } as any, moodEngine);
   return {
-    engine: new EmotionManager(repository, { getCount: () => 0, record: () => {} } as any),
-    repository,
+    engine: emotionManager,
+    moodEngine,
+    repository: memoryRepo,
+    moodRepo,
   };
 }
 
 describe("PersonalityManager", () => {
   it("builds a system prompt with behavior state", () => {
-    const { engine, repository } = createMoodEngine();
+    const { engine, repository, moodRepo } = createMoodEngine();
 
     engine.recordAssistantReply("What hobbies do you enjoy?");
     engine.recordUserTurn("My dog likes pedigree");
@@ -36,11 +45,12 @@ describe("PersonalityManager", () => {
     const prompt = manager.getSystemPrompt();
 
     assert(prompt.includes("Arcon"));
-    assert(prompt.includes("Frustration Level: 1"));
+    assert(prompt.includes("Frustration: 0.10"));
     assert(prompt.includes("Ask Count: 1"));
     assert(prompt.includes("Curiosity"));
 
     repository.close();
+    moodRepo.close();
   });
 
   it("behavior prompt changes instruction thresholds by ask count", () => {
@@ -52,10 +62,11 @@ describe("PersonalityManager", () => {
         curiosity: 0.4,
         trust: 0.5,
         confidence: 0.3,
+        excitement: 0.3,
       },
       mood: {
         curiosity: 0.5,
-        frustration: 5,
+        frustration: 0.5,
         askCount: 6,
         pendingQuestion: false,
         trust: 0.5,
@@ -68,7 +79,7 @@ describe("PersonalityManager", () => {
       ],
     });
 
-    assert(prompt.includes("Frustration Level: 5"));
+    assert(prompt.includes("Frustration: 0.50"));
     assert(prompt.includes("Ask Count: 6"));
     assert(prompt.includes("Mostly use statements"));
     assert(prompt.includes("Arcon interests: programming"));
@@ -85,10 +96,11 @@ describe("PersonalityManager", () => {
         curiosity: 0.8,
         trust: 0.7,
         confidence: 0.7,
+        excitement: 0.7,
       },
       mood: {
         curiosity: 0.8,
-        frustration: 7,
+        frustration: 0.7,
         askCount: 1,
         pendingQuestion: false,
         trust: 0.7,

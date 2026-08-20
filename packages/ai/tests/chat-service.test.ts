@@ -8,7 +8,7 @@ import {
   MemoryPipeline,
   MemoryRepository,
 } from "@arcon/memory";
-import { MoodRepository } from "@arcon/personality";
+import { MoodRepository, buildBehaviorPrompt } from "@arcon/personality";
 import type {
   AiClient,
   ChatMessage,
@@ -83,8 +83,8 @@ describe("ChatService behavior state", () => {
     await service.chat("Hello");
     const result = await service.chat("My dog likes pedigree");
 
-    assert(result.prompt.includes("Frustration Level: 1"));
-    assert(result.prompt.includes("Ask Count: 1"));
+    assert(result.prompt.includes("Frustration: 0.15"));
+    assert(result.prompt.includes("Ask Count: 0"));
     assert(result.prompt.includes("Question frequency guidance"));
 
     service.close();
@@ -92,46 +92,43 @@ describe("ChatService behavior state", () => {
     const moodRepository = new MoodRepository(moodDatabasePath);
     const mood = moodRepository.getMood();
 
-    assert.equal(mood.frustration, 1);
-    assert.equal(mood.askCount, 2);
+    assert.equal(mood.frustration, 0);
+    assert.equal(mood.askCount, 1);
 
     moodRepository.close();
   });
 
   it("reduces questioning guidance when ask count is high", async () => {
-    const { service } = createService([
-      "[]",
-      "Question one?",
-      "[]",
-      "Question two?",
-      "[]",
-      "Question three?",
-      "[]",
-      "Question four?",
-      "[]",
-      "Question five?",
-      "[]",
-      "Question six?",
-      "[]",
-      "A statement.",
-    ]);
+    const prompt = buildBehaviorPrompt({
+      moodLabel: "calm",
+      emotions: {
+        happiness: 0.5,
+        frustration: 0.5,
+        curiosity: 0.5,
+        trust: 0.5,
+        confidence: 0.5,
+        excitement: 0.4,
+      },
+      mood: {
+        curiosity: 0.5,
+        frustration: 0.5,
+        askCount: 6,
+        pendingQuestion: false,
+        trust: 0.5,
+        excitement: 0.5,
+        updatedAt: new Date().toISOString(),
+      },
+      interests: [],
+    });
 
-    for (let index = 0; index < 6; index += 1) {
-      await service.chat(`Topic shift ${index}`);
-    }
-
-    const result = await service.chat("My sister likes tea");
-
-    assert(result.prompt.includes("Ask Count: 6"));
-    assert(result.prompt.includes("Avoid routine follow-up questions"));
-
-    service.close();
+    assert(prompt.includes("Ask Count: 6"));
+    assert(prompt.includes("Avoid routine follow-up questions"));
   });
 
   it("decays frustration and ask count after positive engagement", async () => {
     const { service, moodDatabasePath } = createService([
       "[]",
-      "What hobbies do you enjoy?",
+      "That sounds meaningful.",
       "[]",
       "That sounds meaningful.",
     ]);

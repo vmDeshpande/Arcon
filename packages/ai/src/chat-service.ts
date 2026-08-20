@@ -89,9 +89,9 @@ export class ChatService {
       options.moodDatabasePath ?? "./data/mood.sqlite",
     );
 
-    this.moodEngine = new MoodEngine(this.moodRepository);
-
     this.emotionEngine = new EmotionManager(this.repository, this.experiences);
+    this.moodEngine = new MoodEngine(this.moodRepository, this.emotionEngine);
+    this.emotionEngine.setMoodEngine(this.moodEngine);
     this.interestEngine = new InterestEngine(this.repository);
     this.lastEmotionTimestamp = Date.now();
 
@@ -148,7 +148,6 @@ export class ChatService {
     this.lastEmotionTimestamp = now;
 
     this.moodEngine.recordUserTurn(message);
-    this.emotionEngine.recordUserTurn(message);
 
     const experience = classifyExperience(message);
 
@@ -404,19 +403,7 @@ export class ChatService {
     const reply = await this.aiClient.generateReply(messages);
 
     this.moodEngine.recordAssistantReply(reply);
-    this.emotionEngine.recordAssistantReply(reply);
     this.conversationContext.addAssistantMessage(this.conversationId, reply);
-
-    const arconExperience = classifyArconExperience(
-      reply,
-      cognitiveResult.strategy,
-      intent,
-    );
-
-    if (arconExperience) {
-      this.experiences.record(arconExperience);
-      this.emotionEngine.updateOnEvent(arconExperience, reply);
-    }
 
     this.emotionEngine.recordAssistantTurn(reply, {
       strategy: cognitiveResult.strategy,
@@ -459,7 +446,6 @@ export class ChatService {
     this.lastEmotionTimestamp = now;
 
     this.moodEngine.recordUserTurn(message);
-    this.emotionEngine.recordUserTurn(message);
 
     const experience = classifyExperience(message);
 
@@ -654,19 +640,7 @@ export class ChatService {
     }
 
     this.moodEngine.recordAssistantReply(fullReply);
-    this.emotionEngine.recordAssistantReply(fullReply);
     this.conversationContext.addAssistantMessage(this.conversationId, fullReply);
-
-    const arconExperience = classifyArconExperience(
-      fullReply,
-      cognitiveResult.strategy,
-      intent,
-    );
-
-    if (arconExperience) {
-      this.experiences.record(arconExperience);
-      this.emotionEngine.updateOnEvent(arconExperience, fullReply);
-    }
 
     this.emotionEngine.recordAssistantTurn(fullReply, {
       strategy: cognitiveResult.strategy,

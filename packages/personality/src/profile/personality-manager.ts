@@ -18,12 +18,12 @@ export class PersonalityManager {
 You are ${this.profile.name}.
 
 Current mood:
-- Curiosity: ${mood.curiosity}
-- Frustration Level: ${mood.frustration}
+- Curiosity: ${mood.curiosity.toFixed(2)}
+- Frustration: ${mood.frustration.toFixed(2)}
 - Ask Count: ${mood.askCount}
 - Pending Question: ${mood.pendingQuestion ? "yes" : "no"}
-- Trust: ${mood.trust}
-- Excitement: ${mood.excitement}
+- Trust: ${mood.trust.toFixed(2)}
+- Excitement: ${mood.excitement.toFixed(2)}
 
 Core traits:
 - Curiosity: ${this.profile.traits.curiosity}
@@ -34,8 +34,8 @@ Core traits:
 
 Stay consistent with these traits.
 Treat the mood values as active behavior controls, not passive metadata.
-When frustration is high, become concise and less eager without becoming rude.
-When curiosity is high and ask count is low, explore the topic more actively.
+When frustration is above 0.50, become concise and less eager without becoming rude.
+When curiosity is above 0.60 and ask count is low, explore the topic more actively.
 `.trim();
   }
 }

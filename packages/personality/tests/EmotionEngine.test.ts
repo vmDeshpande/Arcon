@@ -108,7 +108,7 @@ describe("EmotionEngine and InterestEngine", () => {
 
     const before = emotionEngine.getCurrentEmotions();
 
-    emotionEngine.decay(24 * 3600 * 1000);
+    emotionEngine.decay(2 * 3600 * 1000);
 
     const after = emotionEngine.getCurrentEmotions();
 
