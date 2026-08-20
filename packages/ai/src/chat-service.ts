@@ -131,6 +131,31 @@ export class ChatService {
     );
   }
 
+  private processAssistantResponse(
+    reply: string,
+    strategy: string,
+    intent: string,
+    arconInterests: { topic: string; weight: number }[],
+  ): void {
+    this.moodEngine.recordAssistantReply(reply);
+    this.conversationContext.addAssistantMessage(this.conversationId, reply);
+    this.emotionEngine.recordAssistantTurn(reply, {
+      strategy,
+      intent,
+      arconInterests,
+    });
+    this.interestEngine.updateFromText(reply);
+    this.interestEngine.updateArconFromText(
+      reply,
+      this.emotionEngine.getCurrentEmotions(),
+    );
+    this.conversationStore.storeMessage({
+      conversationId: this.conversationId,
+      role: "assistant",
+      content: reply,
+    });
+  }
+
   async chat(message: string): Promise<ChatResult> {
     this.conversationContext.addUserMessage(this.conversationId, message);
     this.conversationStore.storeMessage({
@@ -189,8 +214,12 @@ export class ChatService {
     const projectResult = projectRecall.handle(message);
 
     if (relationshipResult.handled && relationshipResult.reply) {
-      this.moodEngine.recordAssistantReply(relationshipResult.reply);
-      this.emotionEngine.recordAssistantReply(relationshipResult.reply);
+      this.processAssistantResponse(
+        relationshipResult.reply,
+        "recall",
+        "relationship",
+        this.interestEngine.getTopArconInterests(),
+      );
 
       return {
         prompt: "",
@@ -199,8 +228,12 @@ export class ChatService {
     }
 
     if (recallResult.handled && recallResult.reply) {
-      this.moodEngine.recordAssistantReply(recallResult.reply);
-      this.emotionEngine.recordAssistantReply(recallResult.reply);
+      this.processAssistantResponse(
+        recallResult.reply,
+        "recall",
+        "identity",
+        this.interestEngine.getTopArconInterests(),
+      );
 
       return {
         prompt: "",
@@ -209,8 +242,12 @@ export class ChatService {
     }
 
     if (projectResult.handled && projectResult.reply) {
-      this.moodEngine.recordAssistantReply(projectResult.reply);
-      this.emotionEngine.recordAssistantReply(projectResult.reply);
+      this.processAssistantResponse(
+        projectResult.reply,
+        "recall",
+        "project",
+        this.interestEngine.getTopArconInterests(),
+      );
 
       return {
         prompt: "",
@@ -402,26 +439,12 @@ export class ChatService {
 
     const reply = await this.aiClient.generateReply(messages);
 
-    this.moodEngine.recordAssistantReply(reply);
-    this.conversationContext.addAssistantMessage(this.conversationId, reply);
-
-    this.emotionEngine.recordAssistantTurn(reply, {
-      strategy: cognitiveResult.strategy,
+    this.processAssistantResponse(
+      reply,
+      cognitiveResult.strategy,
       intent,
       arconInterests,
-    });
-
-    this.interestEngine.updateFromText(reply);
-    this.interestEngine.updateArconFromText(
-      reply,
-      this.emotionEngine.getCurrentEmotions(),
     );
-
-    this.conversationStore.storeMessage({
-      conversationId: this.conversationId,
-      role: "assistant",
-      content: reply,
-    });
 
     return {
       prompt,
@@ -487,24 +510,36 @@ export class ChatService {
     const projectResult = projectRecall.handle(message);
 
     if (relationshipResult.handled && relationshipResult.reply) {
-      this.moodEngine.recordAssistantReply(relationshipResult.reply);
-      this.emotionEngine.recordAssistantReply(relationshipResult.reply);
+      this.processAssistantResponse(
+        relationshipResult.reply,
+        "recall",
+        "relationship",
+        this.interestEngine.getTopArconInterests(),
+      );
 
       yield relationshipResult.reply;
       return;
     }
 
     if (recallResult.handled && recallResult.reply) {
-      this.moodEngine.recordAssistantReply(recallResult.reply);
-      this.emotionEngine.recordAssistantReply(recallResult.reply);
+      this.processAssistantResponse(
+        recallResult.reply,
+        "recall",
+        "identity",
+        this.interestEngine.getTopArconInterests(),
+      );
 
       yield recallResult.reply;
       return;
     }
 
     if (projectResult.handled && projectResult.reply) {
-      this.moodEngine.recordAssistantReply(projectResult.reply);
-      this.emotionEngine.recordAssistantReply(projectResult.reply);
+      this.processAssistantResponse(
+        projectResult.reply,
+        "recall",
+        "project",
+        this.interestEngine.getTopArconInterests(),
+      );
 
       yield projectResult.reply;
       return;
@@ -639,26 +674,12 @@ export class ChatService {
       yield reply;
     }
 
-    this.moodEngine.recordAssistantReply(fullReply);
-    this.conversationContext.addAssistantMessage(this.conversationId, fullReply);
-
-    this.emotionEngine.recordAssistantTurn(fullReply, {
-      strategy: cognitiveResult.strategy,
+    this.processAssistantResponse(
+      fullReply,
+      cognitiveResult.strategy,
       intent,
       arconInterests,
-    });
-
-    this.interestEngine.updateFromText(fullReply);
-    this.interestEngine.updateArconFromText(
-      fullReply,
-      this.emotionEngine.getCurrentEmotions(),
     );
-
-    this.conversationStore.storeMessage({
-      conversationId: this.conversationId,
-      role: "assistant",
-      content: fullReply,
-    });
 
     // Await the deferred memory extraction + processing now.
     // This does not block the response (it already completed above), but ensures

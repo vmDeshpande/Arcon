@@ -29,7 +29,8 @@ export function detectUserEmotion(message: string): DetectedUserEmotion | null {
     return { type: ExperienceType.USER_SHARED_FAILURE, confidence: 0.7 };
   }
 
-  if (/\bi\s+(?:\w+\s+)*(?:like|enjoy|love|prefer)\b|\bmy\s+favorite\b/.test(trimmed)) {
+  if (!/\b(?:don't|do\s+not)\s+(?:like|enjoy|love|prefer)\b/.test(trimmed) &&
+      (/\bi\s+(?:\w+\s+){0,2}(?:like|enjoy|love|prefer)\b|\bmy\s+favorite\b/).test(trimmed)) {
     return { type: ExperienceType.USER_SHARED_PREFERENCE, confidence: 0.8 };
   }
 

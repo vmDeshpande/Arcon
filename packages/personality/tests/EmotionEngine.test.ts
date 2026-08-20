@@ -139,4 +139,97 @@ describe("EmotionEngine and InterestEngine", () => {
     experienceRepo.close();
     memoryRepo.close();
   });
+
+  it("new database receives correct baselines", () => {
+    const { memoryRepo, experienceRepo, emotionEngine } = createTestContext();
+
+    const emotions = emotionEngine.getCurrentEmotions();
+
+    assert.equal(emotions.happiness, 0.5);
+    assert.equal(emotions.frustration, 0.1);
+    assert.equal(emotions.curiosity, 0.5);
+    assert.equal(emotions.trust, 0.5);
+    assert.equal(emotions.confidence, 0.5);
+    assert.equal(emotions.excitement, 0.4);
+
+    experienceRepo.close();
+    memoryRepo.close();
+  });
+
+  it("preserves intentional zero frustration across restart", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arcon-emotion-"));
+    const path = join(dir, "memories.sqlite");
+    const repo1 = new MemoryRepository(path);
+    const expRepo1 = new ExperienceRepository(join(dir, "experiences.sqlite"));
+    const engine1 = new EmotionEngine(repo1, new ExperienceManager(expRepo1));
+
+    engine1.updateOnEvent(ExperienceType.USER_SHARED_SUCCESS);
+    const emotions1 = engine1.getCurrentEmotions();
+    repo1.saveEmotion("frustration", 0, Date.now());
+
+    repo1.close();
+    expRepo1.close();
+
+    const repo2 = new MemoryRepository(path);
+    const expRepo2 = new ExperienceRepository(join(dir, "experiences.sqlite"));
+    const engine2 = new EmotionEngine(repo2, new ExperienceManager(expRepo2));
+
+    const emotions2 = engine2.getCurrentEmotions();
+    assert.equal(emotions2.frustration, 0, "intentional zero frustration must survive restart");
+    assert.ok(emotions2.happiness > 0.5, "other emotions should still reflect prior events");
+
+    repo2.close();
+    expRepo2.close();
+  });
+
+  it("preserves non-zero emotions across restart", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arcon-emotion-"));
+    const path = join(dir, "memories.sqlite");
+    const repo1 = new MemoryRepository(path);
+    const expRepo1 = new ExperienceRepository(join(dir, "experiences.sqlite"));
+    const engine1 = new EmotionEngine(repo1, new ExperienceManager(expRepo1));
+
+    engine1.updateOnEvent(ExperienceType.USER_SHARED_PROJECT);
+    engine1.updateOnEvent(ExperienceType.USER_SHARED_PROJECT);
+    const emotions1 = engine1.getCurrentEmotions();
+    assert.ok(emotions1.curiosity > 0.2);
+
+    repo1.close();
+    expRepo1.close();
+
+    const repo2 = new MemoryRepository(path);
+    const expRepo2 = new ExperienceRepository(join(dir, "experiences.sqlite"));
+    const engine2 = new EmotionEngine(repo2, new ExperienceManager(expRepo2));
+
+    const emotions2 = engine2.getCurrentEmotions();
+    assert.ok(emotions2.curiosity > 0.2, "curiosity should survive restart");
+
+    repo2.close();
+    expRepo2.close();
+  });
+
+  it("does not overwrite valid non-zero values on re-initialization", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arcon-emotion-"));
+    const path = join(dir, "memories.sqlite");
+    const repo1 = new MemoryRepository(path);
+    const expRepo1 = new ExperienceRepository(join(dir, "experiences.sqlite"));
+    const engine1 = new EmotionEngine(repo1, new ExperienceManager(expRepo1));
+
+    engine1.updateOnEvent(ExperienceType.USER_PRAISED_ARCON);
+    const emotions1 = engine1.getCurrentEmotions();
+    assert.ok(emotions1.happiness > 0.5);
+
+    repo1.close();
+    expRepo1.close();
+
+    const repo2 = new MemoryRepository(path);
+    const expRepo2 = new ExperienceRepository(join(dir, "experiences.sqlite"));
+    const engine2 = new EmotionEngine(repo2, new ExperienceManager(expRepo2));
+
+    const emotions2 = engine2.getCurrentEmotions();
+    assert.ok(emotions2.happiness > 0.5, "happiness should not be reset to baseline");
+
+    repo2.close();
+    expRepo2.close();
+  });
 });

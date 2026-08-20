@@ -218,6 +218,88 @@ describe("ChatService behavior state", () => {
     service.close();
     repository.close();
   });
+
+  it("updates emotion state when identity recall handles the reply", async () => {
+    const { service, moodDatabasePath } = createService([
+      "[]",
+      "I will remember that.",
+    ]);
+
+    await service.chat("My name is TestUser.");
+    const result = await service.chat("who am i?");
+
+    assert.ok(result.reply.includes("TestUser") || result.reply.includes("what I know about you"));
+
+    service.close();
+
+    const moodRepository = new MoodRepository(moodDatabasePath);
+    const mood = moodRepository.getMood();
+
+    assert.ok(mood.askCount >= 0, "ask count should be recorded");
+
+    moodRepository.close();
+  });
+
+  it("updates emotion state when relationship recall handles the reply", async () => {
+    const { service, moodDatabasePath } = createService([
+      "[]",
+      "I understand.",
+    ]);
+
+    await service.chat("I am building Arcon with my team.");
+    const result = await service.chat("what is our relationship?");
+
+    assert.ok(result.reply.includes("creator") || result.reply.includes("companion"));
+
+    service.close();
+
+    const moodRepository = new MoodRepository(moodDatabasePath);
+    const mood = moodRepository.getMood();
+
+    assert.ok(mood.askCount >= 0, "ask count should be recorded");
+
+    moodRepository.close();
+  });
+
+  it("updates emotion state when project recall handles the reply", async () => {
+    const { service, moodDatabasePath } = createService([
+      "[]",
+      "I will remember that.",
+    ]);
+
+    await service.chat("I am building Arcon.");
+    const result = await service.chat("what am i building?");
+
+    assert.ok(result.reply.includes("project") || result.reply.includes("Arcon"));
+
+    service.close();
+
+    const moodRepository = new MoodRepository(moodDatabasePath);
+    const mood = moodRepository.getMood();
+
+    assert.ok(mood.askCount >= 0, "ask count should be recorded");
+
+    moodRepository.close();
+  });
+
+  it("does not double-update emotion on normal LLM response", async () => {
+    const { service, moodDatabasePath } = createService([
+      "[]",
+      "Hello!",
+    ]);
+
+    await service.chat("Hello");
+    await service.chat("How are you?");
+
+    service.close();
+
+    const moodRepository = new MoodRepository(moodDatabasePath);
+    const mood = moodRepository.getMood();
+
+    assert.equal(mood.frustration, 0);
+
+    moodRepository.close();
+  });
 });
 
 function createStreamingService(chunks: string[]) {

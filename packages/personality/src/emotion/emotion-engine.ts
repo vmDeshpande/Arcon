@@ -234,6 +234,9 @@ export class EmotionEngine {
     };
 
     for (const row of rows) {
+      if (row.name === "_emotion_schema_version") {
+        continue;
+      }
       if (row.name in state) {
         (state as unknown as Record<string, number>)[row.name] = (row as { value: number }).value;
       }
@@ -411,31 +414,25 @@ export class EmotionEngine {
   private initializeEmotionState(): void {
     const existing = this.memoryRepo.listEmotions();
     const now = Date.now();
+    const versionMarker = "_emotion_schema_version";
+    const hasVersionMarker = existing.some((row) => row.name === versionMarker);
 
-    if (existing.length === 0) {
-      for (const emotion of Object.keys(EMOTION_BASELINES) as Array<keyof Emotions>) {
-        this.memoryRepo.saveEmotion(emotion, EMOTION_BASELINES[emotion], now);
+    if (!hasVersionMarker) {
+      const emotionRows = existing.filter((row) => row.name !== versionMarker);
+      const isLegacyAllZeros = emotionRows.length > 0 &&
+        emotionRows.every((row) => (row as { value: number }).value === 0);
+
+      if (existing.length === 0 || isLegacyAllZeros) {
+        for (const emotion of Object.keys(EMOTION_BASELINES) as Array<keyof Emotions>) {
+          this.memoryRepo.saveEmotion(emotion, EMOTION_BASELINES[emotion], now);
+        }
+        this.memoryRepo.saveEmotion(versionMarker, 1, now);
+        return;
       }
-      return;
     }
 
-    const legacyDefaultNames = [
-      "happiness",
-      "frustration",
-      "curiosity",
-      "trust",
-      "confidence",
-    ] as Array<keyof Emotions>;
-
-    const hasLegacyDefaults = existing.every((row) =>
-      row.value === 0 && legacyDefaultNames.includes(row.name as keyof Emotions),
-    );
-
-    if (hasLegacyDefaults) {
-      for (const emotion of Object.keys(EMOTION_BASELINES) as Array<keyof Emotions>) {
-        this.memoryRepo.saveEmotion(emotion, EMOTION_BASELINES[emotion], now);
-      }
-      return;
+    if (!hasVersionMarker) {
+      this.memoryRepo.saveEmotion(versionMarker, 1, now);
     }
 
     for (const emotion of Object.keys(EMOTION_BASELINES) as Array<keyof Emotions>) {
