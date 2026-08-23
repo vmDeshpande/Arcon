@@ -1,0 +1,97 @@
+[12:07:52] Loading tokenizer...
+[12:07:54] Loading model in 4-bit...
+[12:08:04] Resuming: loading adapter from checkpoint...
+[12:08:04] Trainable parameters: 16,515,072 / 2,222,325,248
+[12:08:04] Tokenizing training data...
+[12:08:04] Tokenizing validation data...
+[12:08:04] Loading checkpoint from C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch1-step50...
+[12:08:05] Optimizer state loaded.
+[12:08:05] Scheduler state loaded.
+[12:08:05] Resuming from epoch 1, step 50
+[12:08:05] RESUMING ARCON V2 from checkpoint: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch1-step50
+[12:08:05] Epoch: 1, Step: 50
+[12:08:05] Starting training...
+[12:08:06] Step 51/237 | Loss: 1.8185 | Time: 1.20s | GPU: 2843.7 MB
+[12:08:15] Step 60/237 | Loss: 2.6234 | Time: 0.48s | GPU: 2852.2 MB
+[12:08:21] Step 70/237 | Loss: 2.2719 | Time: 0.51s | GPU: 2848.5 MB
+[12:08:26] Step 80/237 | Loss: 1.3430 | Time: 0.46s | GPU: 2840.3 MB
+[12:08:31] Step 90/237 | Loss: 0.8006 | Time: 0.48s | GPU: 2847.2 MB
+[12:08:37] Step 100/237 | Loss: 1.0993 | Time: 0.43s | GPU: 2838.6 MB
+[12:08:38] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch1-step100
+[12:08:43] Step 110/237 | Loss: 2.0120 | Time: 0.51s | GPU: 2847.2 MB
+[12:08:50] Step 120/237 | Loss: 1.3554 | Time: 0.54s | GPU: 2859.7 MB
+[12:08:57] Step 130/237 | Loss: 2.3271 | Time: 0.50s | GPU: 2855.4 MB
+[12:09:02] Step 140/237 | Loss: 1.4593 | Time: 0.48s | GPU: 2845.9 MB
+[12:09:08] Step 150/237 | Loss: 0.9888 | Time: 0.44s | GPU: 2842.3 MB
+[12:09:09] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch1-step150
+[12:09:14] Step 160/237 | Loss: 2.1781 | Time: 0.45s | GPU: 2836.7 MB
+[12:09:20] Step 170/237 | Loss: 1.6550 | Time: 0.59s | GPU: 2848.1 MB
+[12:09:27] Step 180/237 | Loss: 1.7774 | Time: 0.43s | GPU: 2839.0 MB
+[12:09:37] Step 190/237 | Loss: 1.2568 | Time: 1.52s | GPU: 2867.0 MB
+[12:09:47] Step 200/237 | Loss: 1.0409 | Time: 0.99s | GPU: 2864.8 MB
+[12:09:48] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch1-step200
+[12:09:56] Step 210/237 | Loss: 1.8503 | Time: 0.47s | GPU: 2852.1 MB
+[12:10:02] Step 220/237 | Loss: 2.5471 | Time: 0.62s | GPU: 2847.2 MB
+[12:10:08] Step 230/237 | Loss: 1.3569 | Time: 0.52s | GPU: 2848.1 MB
+[12:10:28] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch1-step237
+[12:10:29] Step 1/237 | Loss: 1.9008 | Time: 0.54s | GPU: 2850.6 MB
+[12:10:33] Step 10/237 | Loss: 1.8489 | Time: 0.49s | GPU: 2845.9 MB
+[12:10:38] Step 20/237 | Loss: 0.7353 | Time: 0.43s | GPU: 2839.9 MB
+[12:10:43] Step 30/237 | Loss: 1.0587 | Time: 0.42s | GPU: 2840.7 MB
+[12:10:49] Step 40/237 | Loss: 1.2584 | Time: 0.50s | GPU: 2854.9 MB
+[12:10:55] Step 50/237 | Loss: 0.9054 | Time: 0.48s | GPU: 2844.2 MB
+[12:10:56] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch2-step50
+[12:11:04] Step 60/237 | Loss: 1.5919 | Time: 0.48s | GPU: 2852.2 MB
+[12:11:10] Step 70/237 | Loss: 1.3978 | Time: 0.51s | GPU: 2848.5 MB
+[12:11:15] Step 80/237 | Loss: 0.9631 | Time: 0.45s | GPU: 2840.3 MB
+[12:11:21] Step 90/237 | Loss: 0.3968 | Time: 0.50s | GPU: 2847.2 MB
+[12:11:27] Step 100/237 | Loss: 0.5787 | Time: 0.44s | GPU: 2838.6 MB
+[12:11:28] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch2-step100
+[12:11:33] Step 110/237 | Loss: 1.2415 | Time: 0.50s | GPU: 2847.2 MB
+[12:11:40] Step 120/237 | Loss: 0.7869 | Time: 0.49s | GPU: 2859.7 MB
+[12:11:48] Step 130/237 | Loss: 1.3550 | Time: 0.49s | GPU: 2855.4 MB
+[12:11:53] Step 140/237 | Loss: 0.6333 | Time: 0.48s | GPU: 2845.9 MB
+[12:11:58] Step 150/237 | Loss: 0.5800 | Time: 0.43s | GPU: 2842.3 MB
+[12:11:59] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch2-step150
+[12:12:05] Step 160/237 | Loss: 1.0784 | Time: 0.44s | GPU: 2836.7 MB
+[12:12:10] Step 170/237 | Loss: 0.7952 | Time: 0.51s | GPU: 2848.1 MB
+[12:12:17] Step 180/237 | Loss: 0.8356 | Time: 0.45s | GPU: 2839.0 MB
+[12:12:26] Step 190/237 | Loss: 0.7339 | Time: 1.00s | GPU: 2867.0 MB
+[12:12:36] Step 200/237 | Loss: 0.6317 | Time: 0.84s | GPU: 2864.8 MB
+[12:12:37] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch2-step200
+[12:12:44] Step 210/237 | Loss: 1.2473 | Time: 0.47s | GPU: 2852.1 MB
+[12:12:49] Step 220/237 | Loss: 1.6369 | Time: 0.49s | GPU: 2847.2 MB
+[12:12:55] Step 230/237 | Loss: 0.7870 | Time: 0.50s | GPU: 2848.1 MB
+[12:13:15] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch2-step237
+[12:13:15] Step 1/237 | Loss: 1.1933 | Time: 0.56s | GPU: 2850.6 MB
+[12:13:20] Step 10/237 | Loss: 1.0994 | Time: 0.47s | GPU: 2845.9 MB
+[12:13:26] Step 20/237 | Loss: 0.2394 | Time: 0.43s | GPU: 2839.9 MB
+[12:13:31] Step 30/237 | Loss: 0.5902 | Time: 0.57s | GPU: 2840.7 MB
+[12:13:36] Step 40/237 | Loss: 0.7424 | Time: 0.46s | GPU: 2854.9 MB
+[12:13:42] Step 50/237 | Loss: 0.4019 | Time: 0.49s | GPU: 2844.2 MB
+[12:13:43] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch3-step50
+[12:13:52] Step 60/237 | Loss: 0.7901 | Time: 0.47s | GPU: 2852.2 MB
+[12:13:57] Step 70/237 | Loss: 0.7481 | Time: 0.50s | GPU: 2848.5 MB
+[12:14:02] Step 80/237 | Loss: 0.4900 | Time: 0.45s | GPU: 2840.3 MB
+[12:14:08] Step 90/237 | Loss: 0.3691 | Time: 0.49s | GPU: 2847.2 MB
+[12:14:14] Step 100/237 | Loss: 0.6131 | Time: 0.43s | GPU: 2838.6 MB
+[12:14:15] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch3-step100
+[12:14:21] Step 110/237 | Loss: 0.5422 | Time: 0.50s | GPU: 2847.2 MB
+[12:14:28] Step 120/237 | Loss: 0.3042 | Time: 0.59s | GPU: 2859.7 MB
+[12:14:36] Step 130/237 | Loss: 0.6721 | Time: 0.57s | GPU: 2855.4 MB
+[12:14:42] Step 140/237 | Loss: 0.3342 | Time: 0.57s | GPU: 2845.9 MB
+[12:14:47] Step 150/237 | Loss: 0.2778 | Time: 0.44s | GPU: 2842.3 MB
+[12:14:48] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch3-step150
+[12:14:54] Step 160/237 | Loss: 0.3641 | Time: 0.50s | GPU: 2836.7 MB
+[12:14:59] Step 170/237 | Loss: 0.4357 | Time: 0.53s | GPU: 2848.1 MB
+[12:15:06] Step 180/237 | Loss: 0.3259 | Time: 0.45s | GPU: 2839.0 MB
+[12:15:15] Step 190/237 | Loss: 0.4034 | Time: 1.06s | GPU: 2867.0 MB
+[12:15:25] Step 200/237 | Loss: 0.3879 | Time: 0.93s | GPU: 2864.8 MB
+[12:15:26] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch3-step200
+[12:15:33] Step 210/237 | Loss: 0.6262 | Time: 0.48s | GPU: 2852.1 MB
+[12:15:39] Step 220/237 | Loss: 0.8397 | Time: 0.52s | GPU: 2847.2 MB
+[12:15:45] Step 230/237 | Loss: 0.3571 | Time: 0.53s | GPU: 2848.1 MB
+[12:16:06] Checkpoint saved: C:\Projects\Arcon\training\outputs\arcon-v2\checkpoints\checkpoint-epoch3-step237
+[12:16:06] Saving adapter to C:\Projects\Arcon\training\outputs\arcon-v2\adapter...
+[12:16:07] Reloading adapter from disk...
+[12:18:32] Report saved to C:\Projects\Arcon\training\outputs\arcon-v2\training-report.md

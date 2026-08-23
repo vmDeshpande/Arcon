@@ -45,6 +45,10 @@ export class SQLiteConversationMemory implements ConversationMemory {
   close(): void {
     this.store.close();
   }
+
+  async createConversation(conversationId: string): Promise<void> {
+    this.store.createConversation({ id: conversationId });
+  }
 }
 
 export function createConversationMemory(databasePath: string): ConversationMemory {

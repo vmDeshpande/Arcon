@@ -1,0 +1,63 @@
+{
+  "dataset_name": "Arcon Training Dataset V1",
+  "version": "v1.0.0",
+  "created_at": "2026-08-21T16:37:36.199230Z",
+  "base_model": "Qwen/Qwen3-4B",
+  "training_method": "QLoRA",
+  "total_examples": 328,
+  "train_examples": 237,
+  "validation_examples": 91,
+  "categories": {
+    "identity": 62,
+    "cognition": 29,
+    "emotion": 55,
+    "curiosity": 34,
+    "memory": 46,
+    "personality": 58,
+    "anomalies": 44
+  },
+  "train_categories": {
+    "identity": 36,
+    "cognition": 22,
+    "emotion": 38,
+    "curiosity": 26,
+    "memory": 35,
+    "personality": 47,
+    "anomalies": 33
+  },
+  "validation_categories": {
+    "identity": 26,
+    "cognition": 7,
+    "emotion": 17,
+    "curiosity": 8,
+    "memory": 11,
+    "personality": 11,
+    "anomalies": 11
+  },
+  "difficulty_distribution": {
+    "easy": 115,
+    "medium": 200,
+    "hard": 13
+  },
+  "max_content_length": 346,
+  "creation_method": "Manual curation from Arcon specification documents",
+  "validation_status": "pending",
+  "known_limitations": [
+    "Small dataset size — intended as a behavioral foundation, not final model.",
+    "Does not cover all Arcon specification categories.",
+    "No real Arcon conversation data included yet.",
+    "Validation is structural only; human review still required.",
+    "Negative examples are present but not exhaustive.",
+    "Multi-turn examples are limited in length."
+  ],
+  "source_files": [
+    "identity.jsonl",
+    "cognition.jsonl",
+    "emotion.jsonl",
+    "curiosity.jsonl",
+    "memory.jsonl",
+    "personality.jsonl",
+    "anomalies.jsonl"
+  ],
+  "duplicate_count": 0
+}

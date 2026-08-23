@@ -79,7 +79,7 @@ export class ConversationStore {
     const now = new Date().toISOString();
 
     this.db.prepare(`
-      INSERT INTO conversations (id, created_at, updated_at, message_count, topics, summary, metadata)
+      INSERT OR IGNORE INTO conversations (id, created_at, updated_at, message_count, topics, summary, metadata)
       VALUES (?, ?, ?, 0, ?, ?, ?)
     `).run(
       id,

@@ -1,0 +1,38 @@
+# Arcon Dataset V1 Validation Report
+Generated: 2026-08-21T16:37:47.764860Z
+
+## JSONL Syntax
+Errors: 0
+
+## Schema Validation
+Errors: 0
+
+## Content Validation
+Warnings: 0
+
+## Duplicate Check
+Duplicate examples: 0
+
+## Train/Validation Leakage
+Exact content matches: 0
+
+## Category Distribution
+Total: {'identity': 62, 'cognition': 29, 'emotion': 55, 'curiosity': 34, 'memory': 46, 'personality': 58, 'anomalies': 44}
+Train: {'identity': 36, 'cognition': 22, 'emotion': 38, 'curiosity': 26, 'memory': 35, 'personality': 47, 'anomalies': 33}
+Validation: {'identity': 26, 'cognition': 7, 'emotion': 17, 'curiosity': 8, 'memory': 11, 'personality': 11, 'anomalies': 11}
+
+## Length Validation
+Max content length: 346
+
+## Overall Status
+PASS
+All structural checks passed. Dataset is ready for human review.
+
+## Summary
+Train examples: 237
+Validation examples: 91
+Total examples: 328
+Errors: 0
+Warnings: 0
+Duplicates: 0
+Leakage: 0

@@ -1,0 +1,33 @@
+[18:49:06] Python: 3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]
+[18:49:06] PyTorch: 2.11.0+cu128
+[18:49:06] CUDA available: True
+[18:49:06] CUDA version: 12.8
+[18:49:06] GPU: NVIDIA GeForce RTX 3050 6GB Laptop GPU
+[18:49:06] Total VRAM: 6.0 GB
+[18:49:06] System RAM: 15.71 GB
+[18:49:06] Model: Qwen/Qwen3-4B
+[18:49:06] GPU before model: allocated=0.0 MB
+[18:49:06] Loading tokenizer...
+[18:49:08] Tokenizer loaded.
+[18:49:08] Loading model in 4-bit...
+[18:49:26] Model loaded. GPU: allocated=2554.4 MB, reserved=2594.0 MB
+[18:49:26] Preparing for k-bit training...
+[18:49:26] Attaching LoRA...
+[18:49:36] LoRA attached. GPU: allocated=3359.9 MB, reserved=4142.0 MB
+[18:49:36] Trainable: 16,515,072 / Total: 4,038,983,168
+[18:49:36] Loading one training example...
+[18:49:36] Example text length: 291
+[18:49:36] Input shape: torch.Size([1, 65])
+[18:49:36] Running one training step...
+[18:49:56] Step complete. Loss: 7.3123 | Time: 19.36s
+[18:49:56] Peak GPU: allocated=3621.1 MB, max=4327.7 MB
+[18:49:56] Saving adapter to C:\Projects\Arcon\training\outputs\arcon-v1\adapter...
+[18:49:58] Adapter saved: True
+[18:49:58] Adapter files: ['adapter_config.json', 'adapter_model.safetensors', 'README.md']
+[18:49:58] Running smoke test...
+[18:50:58] Response: <think>
+Okay, the user is asking "Who are you?" I need to explain who I am in a clear and friendly way. Let me start by stating my name, Qwen. Then mention that I'm a large language model developed by
+[18:50:58] ============================================================
+[18:50:58] MINIMAL TRAINING PASSED
+[18:50:58] ============================================================
+[18:50:58] Ready for full Training V1.

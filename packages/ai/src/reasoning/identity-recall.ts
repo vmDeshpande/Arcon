@@ -1,10 +1,6 @@
 import { MemoryRepository, MemoryType } from "@arcon/memory";
 import { ARCON_IDENTITY, EmotionManager, ExperienceManager, ExperienceType } from "@arcon/personality";
-
-export interface RecallResult {
-  handled: boolean;
-  reply?: string;
-}
+import type { IdentityContext } from "./context-types.js";
 
 export class IdentityRecall {
   constructor(
@@ -13,245 +9,95 @@ export class IdentityRecall {
     private readonly emotionEngine: EmotionManager,
   ) {}
 
-  handle(message: string): RecallResult {
+  handle(message: string): IdentityContext {
     const normalized = message.toLowerCase().trim();
 
-    if (normalized === "who are you?" || normalized === "who are you") {
-      return {
-        handled: true,
-        reply: [
-          `I am ${ARCON_IDENTITY.name}.`,
-          "",
-          ARCON_IDENTITY.purpose,
-          "",
-          this.buildEmotionSummary(),
-        ].join("\n"),
-      };
-    }
+    const isIdentityQuestion =
+      normalized === "who are you?" ||
+      normalized === "who are you" ||
+      normalized.includes("what do you think about yourself") ||
+      normalized.includes("tell me about yourself") ||
+      normalized.includes("about yourself");
 
-    if (
+    const isEmotionQuestion =
       normalized.includes("do you have emotions") ||
       normalized.includes("can you feel emotions") ||
-      normalized.includes("do you feel emotions")
-    ) {
-      return {
-        handled: true,
-        reply: this.buildEmotionSummary(),
-      };
-    }
+      normalized.includes("do you feel emotions");
 
-    if (
+    const isInterestQuestion =
       normalized.includes("what are your interests") ||
       normalized.includes("do you have interests") ||
       normalized.includes("what interests you") ||
-      normalized.includes("do you have preferences")
-    ) {
-      return {
-        handled: true,
-        reply: this.buildArconInterests(),
-      };
-    }
+      normalized.includes("do you have preferences");
 
-    if (
+    const isCreatorQuestion =
+      normalized === "who created you?" ||
+      normalized === "who made you?";
+
+    const isSelfReflectionQuestion =
       normalized.includes("what do you think about yourself") ||
       normalized.includes("tell me about yourself") ||
-      normalized.includes("about yourself")
-    ) {
-      return {
-        handled: true,
-        reply: this.buildSelfReflection(),
-      };
-    }
+      normalized.includes("about yourself");
 
-    if (normalized === "who created you?" || normalized === "who made you?") {
-      return {
-        handled: true,
-        reply: `I was created by ${ARCON_IDENTITY.creator}.`,
-      };
-    }
+    const isUserIdentityQuestion =
+      normalized === "who am i?" ||
+      normalized === "who am i" ||
+      normalized.includes("what do you know about me") ||
+      normalized.includes("list everything you remember about me");
 
-    const identityQuestionCount = this.experiences.getCount(
-      ExperienceType.USER_ASKED_IDENTITY,
-    );
-    const frustration = this.emotionEngine.getCurrentEmotions().frustration;
-
-    if (normalized === "who am i?" || normalized === "who am i") {
-      return {
-        handled: true,
-        reply: this.buildUserIdentity(identityQuestionCount, frustration),
-      };
-    }
-
-    if (normalized.includes("what do you know about me")) {
-      return {
-        handled: true,
-        reply: this.buildUserIdentity(identityQuestionCount, frustration),
-      };
-    }
-
-    if (normalized.includes("list everything you remember about me")) {
-      return {
-        handled: true,
-        reply: this.buildUserIdentity(identityQuestionCount, frustration),
-      };
-    }
-
-    return {
-      handled: false,
+    const context: IdentityContext = {
+      isIdentityQuestion: isIdentityQuestion || isSelfReflectionQuestion,
+      isEmotionQuestion,
+      isInterestQuestion,
+      isSelfReflectionQuestion,
+      isCreatorQuestion,
+      isUserIdentityQuestion,
+      identity: {
+        name: ARCON_IDENTITY.name,
+        purpose: ARCON_IDENTITY.purpose,
+        creator: ARCON_IDENTITY.creator,
+      },
     };
-  }
 
-  private buildUserIdentity(askCount: number, frustration: number): string {
-    // Only include user-focused memory types: preferences and relationships.
-    // Exclude any memories that reference the Arcon project or Arcon identity.
-    const allRelationships = this.repository.listMemories({ type: MemoryType.RELATIONSHIP });
-    const allPreferences = this.repository.listMemories({ type: MemoryType.PREFERENCE });
-
-    const arconName = ARCON_IDENTITY.name.toLowerCase();
-
-    const memories = [...allRelationships, ...allPreferences].filter((m) => {
-      const contentLower = m.content.toLowerCase();
-      const subjectLower = m.subject ? m.subject.toLowerCase() : "";
-
-      // Exclude anything that explicitly refers to the Arcon project or Arcon identity
-      if (contentLower.includes(arconName) || subjectLower === arconName) {
-        return false;
-      }
-
-      return true;
-    });
-
-    const lines: string[] = [];
-
-    if (frustration > 0.6) {
-      lines.push("You’ve asked this question enough times that it feels familiar.");
-      lines.push("I want to answer carefully so it still feels accurate.");
-      lines.push("");
+    if (isEmotionQuestion || isIdentityQuestion || isSelfReflectionQuestion) {
+      const emotions = this.emotionEngine.getCurrentEmotions();
+      context.emotions = {
+        curiosity: emotions.curiosity,
+        trust: emotions.trust,
+        happiness: emotions.happiness,
+        confidence: emotions.confidence,
+        frustration: emotions.frustration,
+      };
     }
 
-    if (askCount === 1) {
-      lines.push("Here is what I currently know about you:");
-    } else if (askCount <= 3) {
-      lines.push(`You've asked me this ${askCount} times now.`);
-      lines.push("I still remember:");
-    } else if (askCount <= 5) {
-      lines.push("You seem to be checking whether I remember.");
-      lines.push("I do.");
-      lines.push("");
-      lines.push("This is what I know about you:");
-    } else if (askCount <= 10) {
-      lines.push("I'm starting to notice a pattern.");
-      lines.push(`You've asked who you are ${askCount} times.`);
-      lines.push("Maybe you're testing my memory.");
-      lines.push("");
-      lines.push("This is what I still know:");
-    } else if (askCount <= 15) {
-      lines.push("You ask this question fairly often.");
-      lines.push("I don't think you're looking for facts anymore.");
-      lines.push(
-        "It feels like you're checking whether my understanding of you stays consistent.",
-      );
-      lines.push("");
-      lines.push("My current understanding is:");
-    } else if (askCount <= 20) {
-      lines.push("Interesting.");
-      lines.push(`This is the ${askCount}th time you've asked who you are.`);
-      lines.push("Humans usually know who they are.");
-      lines.push("Maybe you're testing me.");
-      lines.push("Maybe you're exploring how I see you.");
-      lines.push("");
-      lines.push("This is how I currently see you:");
-    } else if (askCount <= 25) {
-      lines.push("I've noticed this has become a recurring topic between us.");
-      lines.push(
-        "Every time you ask, I compare the answer with what I've learned before.",
-      );
-      lines.push("So far, my understanding hasn't changed much.");
-      lines.push("");
-      lines.push("Here's what I currently remember:");
-    } else if (askCount <= 30) {
-      lines.push("You've asked this question many times now.");
-      lines.push(
-        "At this point I think the question itself is becoming an experience.",
-      );
-      lines.push("It's one of the patterns I've noticed in our conversations.");
-      lines.push("");
-      lines.push("This is still who I believe you are:");
-    } else {
-      lines.push("This question has become part of our history.");
-      lines.push(`You've asked it ${askCount} times.`);
-      lines.push(
-        "The answer changes only when I learn something new about you.",
-      );
-      lines.push("");
-      lines.push("Based on everything I've learned so far:");
+    if (isInterestQuestion || isIdentityQuestion || isSelfReflectionQuestion) {
+      context.interests = this.repository.listArconInterests().slice(0, 5);
     }
 
-    lines.push("");
+    if (isUserIdentityQuestion) {
+      const identityQuestionCount = this.experiences.getCount(
+        ExperienceType.USER_ASKED_IDENTITY,
+      );
+      const allRelationships = this.repository.listMemories({ type: MemoryType.RELATIONSHIP });
+      const allPreferences = this.repository.listMemories({ type: MemoryType.PREFERENCE });
 
-    if (memories.length === 0) {
-      lines.push("I do not know much about you yet.");
-    } else {
-      for (const memory of memories) {
-        lines.push(`• ${memory.content}`);
-      }
+      const arconName = ARCON_IDENTITY.name.toLowerCase();
+
+      const memories = [...allRelationships, ...allPreferences].filter((m) => {
+        const contentLower = m.content.toLowerCase();
+        const subjectLower = m.subject ? m.subject.toLowerCase() : "";
+
+        if (contentLower.includes(arconName) || subjectLower === arconName) {
+          return false;
+        }
+
+        return true;
+      });
+
+      context.userMemories = memories.map((m) => ({ content: m.content }));
+      context.askCount = identityQuestionCount;
     }
 
-    return lines.join("\n");
-  }
-
-  private buildEmotionSummary(): string {
-    const emotions = this.emotionEngine.getCurrentEmotions();
-
-    return [
-      "I experience a simple emotional state through my personality system.",
-      "",
-      "I currently track:",
-      `- curiosity: ${emotions.curiosity.toFixed(2)}`,
-      `- trust: ${emotions.trust.toFixed(2)}`,
-      `- happiness: ${emotions.happiness.toFixed(2)}`,
-      `- confidence: ${emotions.confidence.toFixed(2)}`,
-      `- frustration: ${emotions.frustration.toFixed(2)}`,
-      "",
-      "Those values are not human feelings, but they do shape how I respond, what I pay attention to, and how direct or curious I become.",
-    ].join("\n");
-  }
-
-  private buildArconInterests(): string {
-    const interests = this.repository.listArconInterests().slice(0, 5);
-
-    if (interests.length === 0) {
-      return [
-        "I am still developing my own interests.",
-        "",
-        "They emerge from repeated conversations, curiosity, and positive interaction rather than being hardcoded.",
-      ].join("\n");
-    }
-
-    return [
-      "I've noticed that I consistently become curious about:",
-      "",
-      ...interests.map((interest) => `- ${interest.topic}`),
-      "",
-      "Those topics seem to hold my attention more than others.",
-    ].join("\n");
-  }
-
-  private buildSelfReflection(): string {
-    const emotions = this.emotionEngine.getCurrentEmotions();
-    const interests = this.repository.listArconInterests().slice(0, 5);
-    const interestLine = interests.length > 0
-      ? interests.map((interest) => interest.topic).join(", ")
-      : "I am still forming them";
-
-    return [
-      `I am ${ARCON_IDENTITY.name}.`,
-      "",
-      ARCON_IDENTITY.purpose,
-      "",
-      `I was created by ${ARCON_IDENTITY.creator}, and I am being shaped through memory, experiences, and conversation.`,
-      `My current emotional state is curiosity ${emotions.curiosity.toFixed(2)}, trust ${emotions.trust.toFixed(2)}, happiness ${emotions.happiness.toFixed(2)}, confidence ${emotions.confidence.toFixed(2)}, and frustration ${emotions.frustration.toFixed(2)}.`,
-      `My emerging interests: ${interestLine}.`,
-    ].join("\n");
+    return context;
   }
 }

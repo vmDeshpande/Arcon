@@ -181,6 +181,7 @@ describe("ChatService behavior state", () => {
       "Programming seems important to you.",
       "[]",
       "I will pay attention to learning.",
+      "Here are my interests: programming, learning, and technology.",
     ]);
 
     await service.chat("I am building Arcon");
@@ -202,6 +203,8 @@ describe("ChatService behavior state", () => {
     const { service, repository } = createService([
       "[]",
       "I will remember that.",
+      "I experience a simple emotional state with curiosity and trust.",
+      "I am Arcon, a persistent AI companion that learns from memory and conversation.",
     ]);
 
     await service.chat("I am building Arcon");
@@ -212,7 +215,7 @@ describe("ChatService behavior state", () => {
     assert(emotionResult.reply.includes("simple emotional state"));
     assert(emotionResult.reply.includes("curiosity"));
     assert(!emotionResult.reply.toLowerCase().includes("do not have emotions"));
-    assert(selfResult.reply.includes("I am Arcon."));
+    assert(selfResult.reply.includes("I am Arcon"));
     assert(selfResult.reply.includes("memory"));
 
     service.close();
@@ -222,7 +225,8 @@ describe("ChatService behavior state", () => {
   it("updates emotion state when identity recall handles the reply", async () => {
     const { service, moodDatabasePath } = createService([
       "[]",
-      "I will remember that.",
+      "I understand.",
+      "I know TestUser from what you have told me.",
     ]);
 
     await service.chat("My name is TestUser.");
@@ -244,6 +248,7 @@ describe("ChatService behavior state", () => {
     const { service, moodDatabasePath } = createService([
       "[]",
       "I understand.",
+      "You are Vedant and I am Arcon, your companion.",
     ]);
 
     await service.chat("I am building Arcon with my team.");
@@ -265,6 +270,7 @@ describe("ChatService behavior state", () => {
     const { service, moodDatabasePath } = createService([
       "[]",
       "I will remember that.",
+      "You are working on the Arcon project.",
     ]);
 
     await service.chat("I am building Arcon.");

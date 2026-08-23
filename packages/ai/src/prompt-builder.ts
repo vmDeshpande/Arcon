@@ -1,25 +1,22 @@
+import type { ContextSelection } from "./cognitive/context-selection.js";
+
 export interface PromptBuildInput {
   systemPrompt: string;
-  memoryContext: string;
-  conversationHistory: string[];
   userMessage: string;
+  context: ContextSelection;
+  conversationHistory: string[];
   strategy?: {
     responseStrategy: string;
     reason: string;
     tone: string;
   };
-  relevantConversations?: Array<{
-    conversationId: string;
-    messages: { role: string; content: string }[];
-  }>;
 }
 
 export class PromptBuilder {
   build(input: PromptBuildInput): string {
-    const sections = [
+    const sections: string[] = [
       "SYSTEM:",
       input.systemPrompt,
-
       "",
     ];
 
@@ -33,26 +30,60 @@ export class PromptBuilder {
       );
     }
 
-    sections.push(
-      "MEMORIES:",
-      input.memoryContext || "No relevant memories.",
+    if (input.context.includeArconIdentity) {
+      sections.push("ARCON IDENTITY:");
+      sections.push("You are Arcon, a persistent AI companion being built by Vedant.");
+      sections.push("");
+    }
 
-      "",
-    );
+    if (input.context.includeEmotionState) {
+      const emotions = input.context.understanding;
+      sections.push("CURRENT STATE:");
+      sections.push("Use the emotional state naturally. Do not list numerical values unless asked.");
+      sections.push("");
+    }
 
-    if (input.relevantConversations && input.relevantConversations.length > 0) {
-      sections.push("RELEVANT PAST CONVERSATIONS:");
-
-      for (const conv of input.relevantConversations) {
-        sections.push(`Conversation ${conv.conversationId}:`);
-
-        for (const msg of conv.messages) {
-          const role = msg.role === "user" ? "User" : "Arcon";
-          sections.push(`${role}: ${msg.content}`);
-        }
-
-        sections.push("");
+    if (input.context.includeInterests) {
+      if (input.context.understanding.subject === "user") {
+        sections.push("USER INTERESTS:");
+        sections.push("These are the user's interests. Do not claim them as your own.");
+      } else {
+        sections.push("ARCON INTERESTS:");
+        sections.push("These are Arcon's own interests and topics of curiosity.");
       }
+      sections.push("");
+    }
+
+    if (input.context.includeUserProfile) {
+      sections.push("USER CONTEXT:");
+      sections.push("Use this information to personalize responses about the user.");
+      sections.push("");
+    }
+
+    if (input.context.includeProjects) {
+      sections.push("PROJECT CONTEXT:");
+      sections.push("Use this information when the user asks about projects or what they are building.");
+      sections.push("");
+    }
+
+    const memories = input.context.memories;
+
+    if (memories.length > 0) {
+      sections.push("RELEVANT MEMORIES:");
+      for (const memory of memories) {
+        sections.push(`[${memory.type}] ${memory.content}`);
+      }
+      sections.push("");
+    }
+
+    const pastConversations = input.context.includeRelevantPastConversations;
+
+    if (pastConversations && input.conversationHistory.length > 0) {
+      sections.push("RELEVANT PAST CONVERSATION:");
+      for (const line of input.conversationHistory.slice(-8)) {
+        sections.push(line);
+      }
+      sections.push("");
     }
 
     if (input.conversationHistory.length > 0) {

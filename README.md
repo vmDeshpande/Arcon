@@ -135,41 +135,46 @@ Those are very different things.
                     User
                       │
                       ▼
-              Intent Classification
+                Web UI / CLI
                       │
                       ▼
-             Emotion & Experience
+             Node.js Arcon Runtime
                       │
                       ▼
-             Interest & Curiosity
+            Cognitive Processing Layer
+            ┌─────────────────────────┐
+            │ Question Understanding   │
+            │ Context Selection        │
+            │ Relevance Ranking        │
+            │ Conflict Resolution      │
+            └─────────────────────────┘
                       │
                       ▼
-          Semantic Memory Extraction
+             PromptBuilder
                       │
                       ▼
-            Validation & Normalisation
+           ArconLoRAProvider
                       │
                       ▼
-             Entity Resolution
+        Python Inference Service
                       │
                       ▼
-              Knowledge Builder
+        Qwen/Qwen3-4B + Arcon V1 LoRA
                       │
                       ▼
-               Memory Pipeline
+           Generated Response
                       │
-                      ▼
-             Memory Retrieval
-                      │
-                      ▼
-             Prompt Construction
-                      │
-                      ▼
-                    Ollama
-                      │
-                      ▼
-                  Response
+          ┌────────────┴────────────┐
+          ▼                         ▼
+   User Response          State Updates
+                               ▼
+                  Memory / Emotion /
+                  Interests / Experiences
+                               ▼
+                          Persistence
 ```
+
+The runtime never returns raw context as a response. The model remains responsible for natural-language understanding, reasoning, and response generation. Runtime systems are responsible for context retrieval, state management, persistence, and cognitive preparation.
 
 ---
 
@@ -326,9 +331,9 @@ data/
 ## ✅ Implemented
 
 * Local chat foundation
-* Ollama integration
+* Arcon LoRA inference backend (Qwen3-4B + Arcon V1)
 * Personal memory repository
-* Semantic memory extraction
+* Semantic memory extraction with think-token handling
 * Regex fallback extraction
 * Memory pipeline
 * Memory validation
@@ -338,17 +343,19 @@ data/
 * Emotional state
 * Mood engine
 * Curiosity engine
-* Interest engine
+* Interest engine (user + Arcon, separated)
 * Experience tracking
 * Prompt builder
 * Context retrieval
+* **Cognitive processing layer** (question understanding, context selection, relevance ranking)
+* **Context contamination prevention**
+* **Conversation persistence across restarts**
 
 ---
 
 ## 🚧 In Progress
 
 * Better reasoning
-* Cognitive orchestration
 * Reflection engine
 * Improved retrieval
 * Internal planning
@@ -357,7 +364,6 @@ data/
 
 ## 📅 Planned
 
-* Reflection
 * Learning from experience
 * Goal management
 * Planning engine
@@ -388,14 +394,10 @@ The goal is to build systems that can continue evolving for years without becomi
 
 * Node.js 20+
 * npm
-* Ollama
-* SQLite
-
-Pull a local model:
-
-```bash
-ollama pull llama3.2
-```
+* Python 3.11+
+* NVIDIA GPU with CUDA (for inference)
+* Qwen/Qwen3-4B model (downloaded automatically by transformers)
+* Arcon V1 LoRA adapter (included in `training/outputs/arcon-v1/adapter/`)
 
 ---
 
@@ -409,11 +411,63 @@ cd Arcon
 npm install
 
 cp .env.example .env
+```
 
+Build all packages:
+
+```bash
 npm run build
+```
+
+---
+
+## Running Arcon
+
+Arcon requires two processes:
+
+**Terminal 1 — Python inference service:**
+
+```powershell
+# Windows
+$env:ARCON_BASE_MODEL = "Qwen/Qwen3-4B"
+$env:ARCON_ADAPTER_PATH = "training/outputs/arcon-v1/adapter"
+$env:ARCON_ADAPTER_NAME = "arcon-v1"
+
+python services/arcon-inference/main.py
+```
+
+```bash
+# macOS / Linux
+export ARCON_BASE_MODEL="Qwen/Qwen3-4B"
+export ARCON_ADAPTER_PATH="training/outputs/arcon-v1/adapter"
+export ARCON_ADAPTER_NAME="arcon-v1"
+
+python services/arcon-inference/main.py
+```
+
+The inference service listens on `http://127.0.0.1:8000`.
+
+**Terminal 2 — Node.js runtime:**
+
+```powershell
+# Windows
+$env:ARCON_INFERENCE_BACKEND = "arcon-lora"
+$env:ARCON_INFERENCE_BASE_URL = "http://127.0.0.1:8000"
+$env:ARCON_ADAPTER_NAME = "arcon-v1"
 
 npm start
 ```
+
+```bash
+# macOS / Linux
+export ARCON_INFERENCE_BACKEND="arcon-lora"
+export ARCON_INFERENCE_BASE_URL="http://127.0.0.1:8000"
+export ARCON_ADAPTER_NAME="arcon-v1"
+
+npm start
+```
+
+The Node.js server listens on `http://127.0.0.1:3000` (or `PORT` from `.env`).
 
 ---
 
@@ -421,6 +475,21 @@ npm start
 
 ```bash
 npm run dev
+```
+
+---
+
+## Verification
+
+```bash
+# Health check
+curl http://127.0.0.1:8000/health
+
+# Model info
+curl http://127.0.0.1:8000/v1/models
+
+# Chat
+curl -X POST http://127.0.0.1:3000/chat -H "Content-Type: application/json" -d "{\"message\":\"Hello Arcon\"}"
 ```
 
 ---
@@ -433,6 +502,202 @@ Project documentation can be found in the `docs/` directory.
 * Design decisions
 * Memory engine
 * Roadmap
+
+---
+
+# Cognitive Layer
+
+Arcon now includes a dedicated cognitive processing stage between user input and model generation.
+
+## Question Understanding
+
+Before retrieving context, the `CognitiveProcessor` classifies the user's intent and determines what information is relevant.
+
+Supported intent categories:
+
+* `IDENTITY` — questions about Arcon itself
+* `EMOTION` — questions about Arcon's emotional state
+* `INTEREST` — questions about Arcon's interests
+* `USER_INTEREST` — questions about the user's interests
+* `PROJECT` — questions about projects or work
+* `MEMORY` — questions about stored memories
+* `CONVERSATION` — questions about conversation history
+* `GENERAL` — all other questions
+
+## Context Selection
+
+Based on the understood intent, the cognitive layer selects which context sources to include:
+
+* Arcon identity
+* Emotional state
+* Arcon interests
+* User profile / user interests
+* Project memories
+* Long-term memories
+* Recent conversation
+* Relevant past conversations
+
+Each intent has strict limits on how much context is retrieved. For example, an identity question does not pull in project memories or unrelated user interests.
+
+## Context Contamination Prevention
+
+The cognitive layer prevents context contamination by:
+
+* Retrieving only memories relevant to the current question
+* Limiting the number of memories and conversation turns per intent
+* Excluding unrelated topics (e.g., Unity project details from a question about binary search trees)
+* Resolving conflicts between old and new information in favor of recency
+
+## Runtime vs Model Responsibility
+
+```text
+RUNTIME = context, state, persistence, retrieval, cognition preparation
+
+MODEL = natural-language understanding, reasoning, interpretation, response generation
+
+UI = presentation
+```
+
+The runtime prepares focused context. The model generates the response. The runtime never returns raw context as a conversational answer.
+
+---
+
+# Memory System
+
+## Flow
+
+```text
+User message
+  → Semantic memory extraction (LLM)
+  → Validation & normalisation
+  → Entity resolution
+  → Memory pipeline (create / update / ignore)
+  → Persistence (SQLite)
+  → Retrieval (on next question)
+  → Cognitive context selection
+  → PromptBuilder
+  → Model generation
+```
+
+## Storage
+
+Memories are stored in `data/memories/personal-memory.sqlite`. Each memory has:
+
+* type (FACT, PREFERENCE, PROJECT, GOAL, RELATIONSHIP, CONSTRAINT)
+* status (ACTIVE, ARCHIVED, OBSOLETE, CONTRADICTED, PENDING_CONFIRMATION)
+* content
+* importance score (1–10)
+* confidence score (0–1)
+* source type (USER_EXPLICIT, USER_CONFIRMED, INFERRED, SYSTEM_OBSERVED)
+* timestamps
+* evidence count
+
+## Retrieval
+
+`MemoryRetriever` ranks memories by keyword relevance, importance, confidence, evidence count, and recency. The cognitive layer then selects only the highest-relevance memories for the current question.
+
+## Persistence
+
+Memories persist across Node.js restarts because they are stored in SQLite files, not in-memory state.
+
+---
+
+# Emotion / Mood / Interests
+
+## EmotionManager
+
+Tracks emotional dimensions: curiosity, trust, happiness, confidence, frustration. Values evolve from user and assistant events.
+
+## MoodEngine
+
+Derives a mood label from the current emotional state and tracks behaviour metadata such as ask count and pending questions.
+
+## InterestEngine
+
+Maintains two separate interest stores:
+
+* **User interests** — learned from user messages
+* **Arcon interests** — learned from Arcon's own responses
+
+**Important:** Arcon's assistant replies are not fed back into the user-interest engine. This prevents Arcon from incorrectly treating its own statements as user preferences.
+
+## Persistence
+
+Emotional state, mood, and interests are persisted in `data/memories/personal-memory.sqlite` and `data/mood.sqlite`.
+
+---
+
+# Model / Inference Setup
+
+## Current Model
+
+* **Base model:** Qwen/Qwen3-4B
+* **Adapter:** Arcon V1 LoRA (rank 8, alpha 16, dropout 0.05, NF4 quantisation)
+* **Inference:** Python FastAPI service (`services/arcon-inference/`)
+* **Runtime:** Node.js (`apps/server/`)
+
+## Inference Service
+
+The Python service loads the base model and LoRA adapter and exposes an OpenAI-compatible `/v1/chat/completions` endpoint.
+
+Environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ARCON_BASE_MODEL` | `Qwen/Qwen3-4B` | Hugging Face model ID |
+| `ARCON_ADAPTER_PATH` | `""` | Path to LoRA adapter directory |
+| `ARCON_ADAPTER_NAME` | `""` | Adapter name for metadata |
+| `ARCON_INFERENCE_HOST` | `127.0.0.1` | Bind host |
+| `ARCON_INFERENCE_PORT` | `8000` | Bind port |
+| `ARCON_MAX_NEW_TOKENS` | `512` | Max generation length |
+| `ARCON_TEMPERATURE` | `0.7` | Sampling temperature |
+| `ARCON_TOP_P` | `0.9` | Top-p sampling |
+| `ARCON_REPETITION_PENALTY` | `1.1` | Repetition penalty |
+
+## Node.js Runtime
+
+The Node.js server connects to the inference service via `ARCON_INFERENCE_BASE_URL` and routes all generation through `ArconLoRAProvider`.
+
+## Model Artifacts
+
+The trained LoRA adapter weights (`adapter_model.safetensors`) are large generated files and are not committed to Git. The repository includes the training code and adapter configuration needed to reproduce them.
+
+---
+
+# Current Limitations
+
+## Model-Side Memory Under-Use
+
+Memory retrieval, persistence, and context selection are all verified working. However, Qwen3-4B occasionally under-uses a retrieved long-term memory even when the memory was successfully retrieved and supplied to the model. The model may defer to conversation context or express caution rather than stating a stored fact directly. This is a model-behaviour limitation, not a memory-system failure.
+
+## Other Verified Limitations
+
+* The cognitive layer uses rule-based intent classification; it does not use the model for question understanding.
+* Context selection is deterministic per intent category; it does not dynamically rank individual memories by semantic similarity to the question.
+* The system requires a CUDA-enabled GPU for inference.
+* The model occasionally outputs `<think>` tokens, which are stripped before display but may affect generation quality.
+
+---
+
+# Test Status
+
+## Unit Tests
+
+* `@arcon/ai`: **32/32 passing**
+* `@arcon/memory`: **93/93 passing**
+* `@arcon/personality`: **44/44 passing**
+
+## Verified Integration Behaviour
+
+* Identity questions return correct self-description
+* Memory storage (e.g., "My favorite programming language is TypeScript") persists correctly
+* Memory retrieval returns stored information on subsequent questions
+* Project storage and recall work across conversation turns
+* Context contamination is prevented (unrelated questions receive pure technical answers)
+* Topic switching works cleanly
+* Returning to previous topics recalls earlier context correctly
+* Restart persistence survives Node.js server restarts
+* Clarification questions are asked when context is insufficient
 
 ---
 

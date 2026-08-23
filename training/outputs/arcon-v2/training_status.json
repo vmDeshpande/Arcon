@@ -1,0 +1,14 @@
+{
+  "status": "COMPLETED",
+  "PID": 23200,
+  "epoch": 3,
+  "step": 237,
+  "total_steps": 711,
+  "progress_percent": 100.0,
+  "train_loss": 0.465676,
+  "validation_loss": 1.6428,
+  "elapsed_seconds": 481.43,
+  "estimated_remaining_seconds": 0,
+  "latest_checkpoint": "C:\\Projects\\Arcon\\training\\outputs\\arcon-v2\\checkpoints\\checkpoint-epoch3-step237",
+  "last_update_timestamp": "2026-08-22T06:48:32.038940Z"
+}

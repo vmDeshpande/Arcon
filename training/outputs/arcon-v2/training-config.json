@@ -1,0 +1,33 @@
+{
+  "base_model": "Qwen/Qwen3-4B",
+  "quantization": "4-bit NF4",
+  "compute_dtype": "float16",
+  "lora_r": 8,
+  "lora_alpha": 16,
+  "lora_dropout": 0.05,
+  "target_modules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ],
+  "sequence_length": 128,
+  "batch_size": 1,
+  "gradient_accumulation_steps": 1,
+  "learning_rate": 0.0002,
+  "optimizer": "AdamW",
+  "scheduler": "cosine",
+  "warmup_ratio": 0.05,
+  "warmup_steps": 11,
+  "epochs": 3,
+  "seed": 42,
+  "dataset_version": "arcon_v1",
+  "training_timestamp": "2026-08-22T06:38:04.928528Z",
+  "train_examples": 237,
+  "validation_examples": 91,
+  "total_examples": 328,
+  "checkpoint_interval": 50
+}

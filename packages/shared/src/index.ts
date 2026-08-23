@@ -28,6 +28,7 @@ export interface ConversationMemory {
   storeMessage(message: Omit<ChatMessage, "id" | "createdAt"> & { createdAt?: string }): Promise<ChatMessage>;
   getRecentMessages(conversationId: string, limit: number): Promise<ChatMessage[]>;
   clearConversation(conversationId: string): Promise<void>;
+  createConversation?(conversationId: string): Promise<void>;
 }
 
 export interface AiClient {

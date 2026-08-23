@@ -1,51 +1,29 @@
 import { MemoryRepository, MemoryType } from "@arcon/memory";
-import { ARCON_IDENTITY, EmotionManager, ExperienceManager, ExperienceType } from "@arcon/personality";
-
-export interface ProjectRecallResult {
-  handled: boolean;
-  reply?: string;
-}
+import { ARCON_IDENTITY } from "@arcon/personality";
+import type { ProjectContext } from "./context-types.js";
 
 export class ProjectRecall {
   constructor(
     private readonly repository: MemoryRepository,
-    private readonly experiences: ExperienceManager,
-    private readonly emotionEngine: EmotionManager,
   ) {}
 
-  handle(message: string): ProjectRecallResult {
+  handle(message: string): ProjectContext {
     const normalized = message.toLowerCase().trim();
 
-    // Direct Arcon identity questions
-    if (normalized === "what is arcon?" || normalized === "what is arcon") {
-      return {
-        handled: true,
-        reply: [
-          `I am ${ARCON_IDENTITY.name}.`,
-          "",
-          ARCON_IDENTITY.purpose,
-        ].join("\n"),
-      };
-    }
-
-    // Questions about current project / what the user is building
-    if (
+    const isProjectQuestion =
       normalized.includes("what am i building") ||
       normalized.includes("what project am i working on") ||
       normalized.includes("what are we building") ||
       normalized.includes("what do you know about arcon") ||
-      normalized.includes("what do you know about the project")
-    ) {
-      return {
-        handled: true,
-        reply: this.buildProjectSummary(),
-      };
-    }
+      normalized.includes("what do you know about the project") ||
+      normalized.includes("what is my current project") ||
+      normalized.includes("what project") ||
+      normalized.includes("what are we working on");
 
-    return { handled: false };
-  }
+    const isArconQuestion =
+      normalized === "what is arcon?" ||
+      normalized === "what is arcon";
 
-  private buildProjectSummary(): string {
     const projectMemories = this.repository.listMemories({ type: MemoryType.PROJECT });
     const facts = this.repository.listMemories({ type: MemoryType.FACT });
 
@@ -63,31 +41,11 @@ export class ProjectRecall {
       );
     });
 
-    const lines: string[] = [];
-
-    lines.push(`Here's what I know about projects and building:`);
-    lines.push("");
-
-    if (projectMemories.length === 0 && relatedFacts.length === 0) {
-      lines.push("I don't have any specific project memories yet.");
-      return lines.join("\n");
-    }
-
-    if (projectMemories.length > 0) {
-      lines.push("Project memories:");
-      for (const m of projectMemories) {
-        lines.push(`• ${m.content}`);
-      }
-      lines.push("");
-    }
-
-    if (relatedFacts.length > 0) {
-      lines.push("Related facts:");
-      for (const m of relatedFacts) {
-        lines.push(`• ${m.content}`);
-      }
-    }
-
-    return lines.join("\n");
+    return {
+      isProjectQuestion,
+      isArconQuestion,
+      projects: projectMemories.map((m) => ({ content: m.content, type: m.type })),
+      relatedFacts: relatedFacts.map((m) => ({ content: m.content })),
+    };
   }
 }

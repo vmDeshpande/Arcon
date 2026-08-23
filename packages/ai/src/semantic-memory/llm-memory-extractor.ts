@@ -12,6 +12,7 @@ import type {
 
 import { parseExtraction } from "./extraction-parser.js";
 import { buildExtractionPrompt } from "./extraction-prompt.js";
+import { stripThinkTokens } from "../utils/strip-think-tokens.js";
 
 export class LlmMemoryExtractor {
   constructor(private readonly aiClient: AiClient) {}
@@ -29,13 +30,16 @@ export class LlmMemoryExtractor {
     ];
 
     const response = await this.aiClient.generateReply(messages);
+    const cleanedResponse = stripThinkTokens(response);
 
     // console.log("RAW EXTRACTION:");
     // console.log(response);
+    // console.log("CLEANED EXTRACTION:");
+    // console.log(cleanedResponse);
 
     return this.repairExtraction(
       message,
-      parseExtraction(response),
+      parseExtraction(cleanedResponse),
     );
   }
 

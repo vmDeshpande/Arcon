@@ -1,0 +1,283 @@
+# LoRA Configuration Benchmark Report
+Generated: 2026-08-21T11:49:48.239156
+Model: Qwen/Qwen3-4B
+Quantization: 4-bit NF4 + double quantization + float16 compute
+GPU: NVIDIA GeForce RTX 3050 6GB Laptop GPU
+Total VRAM: 6.0 GB
+
+## Benchmark Summary
+| Config | Target Modules | r | alpha | Seq | Trainable Params | Peak VRAM (allocated) | Peak VRAM (reserved) | Step Time | Result |
+|--------|-----------------|---|-------|-----|------------------|----------------------|----------------------|-----------|--------|
+| A | q+k+v+o | 8 | 16 | 128 | 5,898,240 | 4938.7 MB | 5032.0 MB | 11.07s | PASS |
+| A | q+k+v+o | 8 | 16 | 256 | 5,898,240 | 6496.6 MB | 6742.0 MB | 24.1s | PASS |
+| A | q+k+v+o | 8 | 16 | 512 | 5,898,240 | 9747.6 MB | 9914.0 MB | 70.08s | PASS |
+| B | q+k+v+o+gate+up+down | 8 | 16 | 128 | 16,515,072 | 5318.9 MB | 5516.0 MB | 15.12s | PASS |
+| B | q+k+v+o+gate+up+down | 8 | 16 | 256 | 16,515,072 | 7216.3 MB | 7444.0 MB | 57.39s | PASS |
+| B | q+k+v+o+gate+up+down | 8 | 16 | 512 | 16,515,072 | 11130.2 MB | 11434.0 MB | 81.81s | PASS |
+| C | q+k+v+o+gate+up+down | 4 | 8 | 128 | 8,257,536 | 5286.9 MB | 5356.0 MB | 13.61s | PASS |
+| C | q+k+v+o+gate+up+down | 4 | 8 | 256 | 8,257,536 | 7183.9 MB | 7374.0 MB | 26.55s | PASS |
+| C | q+k+v+o+gate+up+down | 4 | 8 | 512 | 8,257,536 | 11096.7 MB | 11276.0 MB | 79.3s | PASS |
+
+## Recommendation
+- Lowest peak VRAM: Config A (Attention only) at seq 128 -> 4938.7 MB
+- Fastest step time: Config A (Attention only) at seq 128 -> 11.07s
+- Highest trainable params: Config B (Attention + MLP) at seq 128 -> 16,515,072
+- Recommended for first Arcon training: Config B (r=8) at sequence length 256. Peak VRAM ~7216.3 MB with 16,515,072 trainable parameters.
+
+## Raw Results
+```json
+[
+  {
+    "config": "A",
+    "config_name": "Attention only",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj"
+    ],
+    "r": 8,
+    "alpha": 16,
+    "dropout": 0.05,
+    "seq_length": 128,
+    "trainable_params": 5898240,
+    "total_params": 4028366336,
+    "model_allocated_MB": 2554.4,
+    "model_reserved_MB": 2594.0,
+    "lora_allocated_MB": 3319.4,
+    "lora_reserved_MB": 4100.0,
+    "peak_allocated_MB": 4938.7,
+    "peak_reserved_MB": 5032.0,
+    "step_time_s": 11.07,
+    "oom": false,
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "config": "A",
+    "config_name": "Attention only",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj"
+    ],
+    "r": 8,
+    "alpha": 16,
+    "dropout": 0.05,
+    "seq_length": 256,
+    "trainable_params": 5898240,
+    "total_params": 4028366336,
+    "model_allocated_MB": 2571.9,
+    "model_reserved_MB": 2614.0,
+    "lora_allocated_MB": 3336.9,
+    "lora_reserved_MB": 4120.0,
+    "peak_allocated_MB": 6496.6,
+    "peak_reserved_MB": 6742.0,
+    "step_time_s": 24.1,
+    "oom": false,
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "config": "A",
+    "config_name": "Attention only",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj"
+    ],
+    "r": 8,
+    "alpha": 16,
+    "dropout": 0.05,
+    "seq_length": 512,
+    "trainable_params": 5898240,
+    "total_params": 4028366336,
+    "model_allocated_MB": 2571.9,
+    "model_reserved_MB": 2614.0,
+    "lora_allocated_MB": 3336.9,
+    "lora_reserved_MB": 4120.0,
+    "peak_allocated_MB": 9747.6,
+    "peak_reserved_MB": 9914.0,
+    "step_time_s": 70.08,
+    "oom": false,
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "config": "B",
+    "config_name": "Attention + MLP",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "r": 8,
+    "alpha": 16,
+    "dropout": 0.05,
+    "seq_length": 128,
+    "trainable_params": 16515072,
+    "total_params": 4038983168,
+    "model_allocated_MB": 2571.9,
+    "model_reserved_MB": 2614.0,
+    "lora_allocated_MB": 3377.4,
+    "lora_reserved_MB": 4160.0,
+    "peak_allocated_MB": 5318.9,
+    "peak_reserved_MB": 5516.0,
+    "step_time_s": 15.12,
+    "oom": false,
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "config": "B",
+    "config_name": "Attention + MLP",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "r": 8,
+    "alpha": 16,
+    "dropout": 0.05,
+    "seq_length": 256,
+    "trainable_params": 16515072,
+    "total_params": 4038983168,
+    "model_allocated_MB": 2571.9,
+    "model_reserved_MB": 2614.0,
+    "lora_allocated_MB": 3377.4,
+    "lora_reserved_MB": 4160.0,
+    "peak_allocated_MB": 7216.3,
+    "peak_reserved_MB": 7444.0,
+    "step_time_s": 57.39,
+    "oom": false,
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "config": "B",
+    "config_name": "Attention + MLP",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "r": 8,
+    "alpha": 16,
+    "dropout": 0.05,
+    "seq_length": 512,
+    "trainable_params": 16515072,
+    "total_params": 4038983168,
+    "model_allocated_MB": 2571.9,
+    "model_reserved_MB": 2614.0,
+    "lora_allocated_MB": 3377.4,
+    "lora_reserved_MB": 4160.0,
+    "peak_allocated_MB": 11130.2,
+    "peak_reserved_MB": 11434.0,
+    "step_time_s": 81.81,
+    "oom": false,
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "config": "C",
+    "config_name": "Lower-rank full",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "r": 4,
+    "alpha": 8,
+    "dropout": 0.05,
+    "seq_length": 128,
+    "trainable_params": 8257536,
+    "total_params": 4030725632,
+    "model_allocated_MB": 2571.9,
+    "model_reserved_MB": 2614.0,
+    "lora_allocated_MB": 3345.9,
+    "lora_reserved_MB": 4130.0,
+    "peak_allocated_MB": 5286.9,
+    "peak_reserved_MB": 5356.0,
+    "step_time_s": 13.61,
+    "oom": false,
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "config": "C",
+    "config_name": "Lower-rank full",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "r": 4,
+    "alpha": 8,
+    "dropout": 0.05,
+    "seq_length": 256,
+    "trainable_params": 8257536,
+    "total_params": 4030725632,
+    "model_allocated_MB": 2571.9,
+    "model_reserved_MB": 2614.0,
+    "lora_allocated_MB": 3345.9,
+    "lora_reserved_MB": 4130.0,
+    "peak_allocated_MB": 7183.9,
+    "peak_reserved_MB": 7374.0,
+    "step_time_s": 26.55,
+    "oom": false,
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "config": "C",
+    "config_name": "Lower-rank full",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "r": 4,
+    "alpha": 8,
+    "dropout": 0.05,
+    "seq_length": 512,
+    "trainable_params": 8257536,
+    "total_params": 4030725632,
+    "model_allocated_MB": 2571.9,
+    "model_reserved_MB": 2614.0,
+    "lora_allocated_MB": 3345.9,
+    "lora_reserved_MB": 4130.0,
+    "peak_allocated_MB": 11096.7,
+    "peak_reserved_MB": 11276.0,
+    "step_time_s": 79.3,
+    "oom": false,
+    "error": null,
+    "result": "PASS"
+  }
+]
+```

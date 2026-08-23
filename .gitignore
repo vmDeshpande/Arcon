@@ -1,16 +1,79 @@
+# Dependencies
 node_modules/
+.kilo/node_modules/
+
+# Build output
 dist/
+*.tsbuildinfo
+
+# Environment
 .env
+.env.*
+!.env.example
+
+# Python environments
+.venv/
+venv/
+.venv-*/
+.env.venv
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
 *.log
 data/logs/*
-data/memories/*.sqlite
-data/memories/*.sqlite-shm
-data/memories/*.sqlite-wal
 !data/logs/.gitkeep
-!data/memories/.gitkeep
 
-# Test databases
-packages/memory/.tmp-tests/
+# Runtime databases
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+data/memories/*.sqlite
+data/memories/*.sqlite-shm
+data/memories/*.sqlite-wal
+!data/memories/.gitkeep
+
+# Test artifacts
+.tmp-tests/
+packages/memory/.tmp-tests/
+.tmp-*/
+
+# Training artifacts (large generated files)
+training/outputs/**/adapter_model.safetensors
+training/outputs/**/adapter_model.bin
+training/outputs/**/optimizer.pt
+training/outputs/**/scheduler.pt
+training/outputs/**/training_state.json
+training/outputs/**/checkpoint-*/
+!training/outputs/**/README.md
+!training/outputs/**/adapter_config.json
+
+# Model caches
+.huggingface/
+.cache/
+models/
+
+# Coverage
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Kilo runtime
+.kilo/agent-manager.json
+.kilo/sessions/
+
+# Temporary files
+*.tmp
+*.temp
+.tmp-*
