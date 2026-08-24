@@ -173,4 +173,19 @@ describe("MemoryRepository", () => {
       MemoryValidationError
     );
   });
+
+  test("marks memory as superseded", () => {
+    const memory = repository.createMemory({
+      type: MemoryType.FACT,
+      content: "Old fact",
+      importanceScore: 5,
+      confidenceScore: 0.8,
+      sourceType: MemorySourceType.USER_EXPLICIT
+    });
+
+    const superseded = repository.markSuperseded(memory.id);
+
+    assert.equal(superseded?.status, MemoryStatus.SUPERSEDED);
+    assert.equal(repository.getMemoryById(memory.id)?.status, MemoryStatus.SUPERSEDED);
+  });
 });

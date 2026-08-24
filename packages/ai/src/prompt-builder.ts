@@ -1,9 +1,12 @@
-import type { ContextSelection } from "./cognitive/context-selection.js";
+import type { ContextSelection, ContextSnapshot } from "./cognitive/context-selection.js";
+import type { CognitiveDecision } from "./cognitive-adapter.js";
 
 export interface PromptBuildInput {
   systemPrompt: string;
   userMessage: string;
   context: ContextSelection;
+  snapshot?: ContextSnapshot;
+  cognitiveDecision?: CognitiveDecision;
   conversationHistory: string[];
   strategy?: {
     responseStrategy: string;
@@ -28,6 +31,27 @@ export class PromptBuilder {
         `Tone: ${input.strategy.tone}`,
         "",
       );
+    }
+
+    if (input.cognitiveDecision?.clarificationNeeded) {
+      sections.push("CLARIFICATION REQUIRED:");
+      sections.push("The request is ambiguous or lacks sufficient context. Ask a concise clarifying question.");
+      sections.push("");
+    }
+
+    if (input.cognitiveDecision?.unresolvedConflicts.length) {
+      sections.push("UNRESOLVED CONFLICTS:");
+      for (const conflict of input.cognitiveDecision.unresolvedConflicts) {
+        sections.push(`[${conflict.status}] ${conflict.content}`);
+      }
+      sections.push("Acknowledge uncertainty where appropriate. Do not silently choose a winner.");
+      sections.push("");
+    }
+
+    if (input.cognitiveDecision?.responseMode === "defer") {
+      sections.push("RESPONSE MODE: DEFER");
+      sections.push("Acknowledge the request without providing a full answer yet.");
+      sections.push("");
     }
 
     if (input.context.includeArconIdentity) {
@@ -66,7 +90,7 @@ export class PromptBuilder {
       sections.push("");
     }
 
-    const memories = input.context.memories;
+    const memories = input.snapshot?.relevantMemories ?? input.context.memories;
 
     if (memories.length > 0) {
       sections.push("RELEVANT MEMORIES:");

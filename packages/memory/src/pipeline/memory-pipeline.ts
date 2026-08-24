@@ -2,6 +2,7 @@ import {
   MemoryRepository,
   MemoryStatus,
   MemoryType,
+  MemoryScope,
   type Memory,
 } from "../personal-memory.js";
 import { MemoryExtractor } from "../extractor/memory-extractor.js";
@@ -37,12 +38,13 @@ export class MemoryPipeline {
       options.minConfidenceScore ?? DEFAULT_MIN_CONFIDENCE;
   }
 
-  processMessage(message: string): PipelineResult {
+  async processMessage(message: string): Promise<PipelineResult> {
     const result: PipelineResult = {
       created: 0,
       updated: 0,
       ignored: 0,
       rejected: 0,
+      superseded: 0,
       createdMemories: [],
       updatedMemories: [],
       rejectedCandidates: [],
@@ -61,9 +63,7 @@ export class MemoryPipeline {
         continue;
       }
 
-      const existingMemories = this.repository.listMemories({
-        type: candidate.type,
-      });
+      const existingMemories = await this.getActiveMemories(candidate.type);
       const review = reviewCandidate(candidate, existingMemories);
       // console.log("Review Decision:", review.decision, candidate.content);
 
@@ -75,6 +75,7 @@ export class MemoryPipeline {
             importanceScore: candidate.importanceScore,
             confidenceScore: candidate.confidenceScore,
             sourceType: candidate.sourceType,
+            scope: candidate.scope,
           });
           result.created += 1;
           result.createdMemories.push(created);
@@ -120,9 +121,35 @@ export class MemoryPipeline {
             confidenceScore: candidate.confidenceScore,
             sourceType: candidate.sourceType,
             status: MemoryStatus.PENDING_CONFIRMATION,
+            scope: candidate.scope,
           });
           result.created += 1;
           result.createdMemories.push(created);
+          break;
+        }
+        case "SUPERSEDE": {
+          if (!review.targetMemory) {
+            result.ignored += 1;
+            break;
+          }
+
+          const created = this.repository.createMemory({
+            type: candidate.type,
+            content: candidate.content,
+            importanceScore: candidate.importanceScore,
+            confidenceScore: candidate.confidenceScore,
+            sourceType: candidate.sourceType,
+            scope: candidate.scope,
+            supersedesId: review.targetMemory.id,
+          });
+
+          const superseded = this.repository.markSuperseded(review.targetMemory.id);
+
+          result.created += 1;
+          result.updated += 1;
+          result.superseded += 1;
+          result.createdMemories.push(created);
+          result.updatedMemories.push(superseded ?? review.targetMemory);
           break;
         }
         case "IGNORE": {
@@ -135,14 +162,15 @@ export class MemoryPipeline {
     return result;
   }
 
-  processCandidates(
+  async processCandidates(
     candidates: MemoryCandidate[],
-  ): PipelineResult {
+  ): Promise<PipelineResult> {
     const result: PipelineResult = {
       created: 0,
       updated: 0,
       ignored: 0,
       rejected: 0,
+      superseded: 0,
       createdMemories: [],
       updatedMemories: [],
       rejectedCandidates: [],
@@ -155,9 +183,7 @@ export class MemoryPipeline {
         continue;
       }
 
-      const existingMemories = this.repository.listMemories({
-        type: candidate.type,
-      });
+      const existingMemories = await this.getActiveMemories(candidate.type);
 
       const review = reviewCandidate(candidate, existingMemories);
 
@@ -165,12 +191,13 @@ export class MemoryPipeline {
 
       switch (review.decision) {
         case "CREATE": {
-          const created = this.repository.createMemory({
+          const created = await this.repository.createMemory({
             type: candidate.type,
             content: candidate.content,
             importanceScore: candidate.importanceScore,
             confidenceScore: candidate.confidenceScore,
             sourceType: candidate.sourceType,
+            scope: candidate.scope,
           });
 
           result.created += 1;
@@ -184,7 +211,7 @@ export class MemoryPipeline {
             break;
           }
 
-          const updated = this.repository.updateMemory(review.targetMemory.id, {
+          const updated = await this.repository.updateMemory(review.targetMemory.id, {
             content: candidate.content,
             confidenceScore: Math.max(
               review.targetMemory.confidenceScore,
@@ -207,17 +234,44 @@ export class MemoryPipeline {
         }
 
         case "CONFLICT": {
-          const created = this.repository.createMemory({
+          const created = await this.repository.createMemory({
             type: candidate.type,
             content: candidate.content,
             importanceScore: candidate.importanceScore,
             confidenceScore: candidate.confidenceScore,
             sourceType: candidate.sourceType,
             status: MemoryStatus.PENDING_CONFIRMATION,
+            scope: candidate.scope,
           });
 
           result.created += 1;
           result.createdMemories.push(created);
+          break;
+        }
+
+        case "SUPERSEDE": {
+          if (!review.targetMemory) {
+            result.ignored += 1;
+            break;
+          }
+
+          const created = await this.repository.createMemory({
+            type: candidate.type,
+            content: candidate.content,
+            importanceScore: candidate.importanceScore,
+            confidenceScore: candidate.confidenceScore,
+            sourceType: candidate.sourceType,
+            scope: candidate.scope,
+            supersedesId: review.targetMemory.id,
+          });
+
+          const superseded = await this.repository.markSuperseded(review.targetMemory.id);
+
+          result.created += 1;
+          result.updated += 1;
+          result.superseded += 1;
+          result.createdMemories.push(created);
+          result.updatedMemories.push(superseded ?? review.targetMemory);
           break;
         }
 
@@ -257,6 +311,32 @@ export class MemoryPipeline {
     }
 
     return true;
+  }
+
+  async archiveMemoryCandidate(
+    memoryId: string,
+    reason: string,
+  ): Promise<Memory | null> {
+    const all = await this.repository.listMemories({});
+    const target = all.find((memory) => memory.id === memoryId);
+
+    if (!target || target.status !== MemoryStatus.ACTIVE) {
+      return null;
+    }
+
+    return this.repository.archiveMemory(memoryId);
+  }
+
+  private async getActiveMemories(type: MemoryType): Promise<Memory[]> {
+    const all = await this.repository.listMemories({ type });
+    const excluded = new Set([
+      MemoryStatus.ARCHIVED,
+      MemoryStatus.OBSOLETE,
+      MemoryStatus.CONTRADICTED,
+      MemoryStatus.PENDING_CONFIRMATION,
+      MemoryStatus.SUPERSEDED,
+    ]);
+    return all.filter((memory) => !excluded.has(memory.status));
   }
 
   private normalizeCandidates(

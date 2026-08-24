@@ -1,41 +1,65 @@
 # Roadmap
 
-## Phase 1: Foundation
+## Phase A — Runtime Convergence ✅ COMPLETE
 
-- Text message input
-- Ollama response generation
-- Short-term conversation storage
-- Recent context retrieval
-- Event bus
-- Timestamped logs
+- Canonical runtime path (`apps/server`)
+- Dead/orphaned runtime paths removed
+- Unused reasoning modules removed
+- Unused personality profile manager removed
+- Unused entity resolver/graph query removed
 
-## Later Phases
+## Phase B — Memory Lifecycle ✅ COMPLETE
 
-The following are not part of Phase 1:
+- Structured memory states enforced during retrieval
+- SUPERSEDED memory lineage preserved via `supersedesId`
+- Memory scope added and enforced
+- Stale/invalid memory filtered from normal retrieval
+- Relevance and validity separated
+- Memory pipeline supports CREATE / UPDATE / SUPERSEDE / ARCHIVE / IGNORE / CONFLICT
 
-- Long-term memory
-- Personality engine
-- Screen awareness
-- Browser or desktop automation
-- Web learning
-- Reflection systems
-- Proactive behavior
-- Electron frontend
+## Phase C — Retrieval + Context Selection ✅ COMPLETE
 
-## Voice V1 (interface layer)
+- SQL-level prefiltering by status and scope
+- Explicit relevance threshold
+- `ContextSnapshot` as structured internal state
+- Context selection is deterministic per intent category
+- Context contamination prevented
 
-Voice V1 adds a local-first voice interface that wraps the existing text path rather than replacing it:
+## Phase D — Cognitive Core ✅ COMPLETE
 
-- Microphone capture via ffmpeg (DirectShow on Windows)
-- Speech-to-text via local `faster-whisper`
-- Routing through the existing `ChatService`
-- Text-to-speech via Windows Speech API (with an ffmpeg/flite fallback)
+- `CognitiveDecision` as structured cognitive output
+- Clarification routing in `ChatService`
+- Runtime identity/capability grounding
+- Processing stages represented structurally
+- PromptBuilder consumes `CognitiveDecision` and `ContextSnapshot`
 
-## Voice V2 (interface layer)
+## Phase E — Reflection + Consolidation ✅ COMPLETE
 
-Voice V1 plus natural speech and lower latency, still wrapping the existing text path:
+- Experience model extended with `context` for provenance
+- `ReflectionEngine` analyzes accumulated experiences
+- `ReflectionProcessor` routes proposals through `MemoryPipeline`
+- `ReflectionTrigger` provides background/deferred execution
+- Evidence tracking for all proposals
+- Weak evidence rejection (configurable threshold)
+- Supersession lineage preserved
 
-- **Natural voice:** local neural TTS via **Piper** (Windows SAPI / ffmpeg-flite as fallbacks). No cloud, no GPU.
-- **Lower latency:** smaller end-of-speech silence tail (800 ms → 450 ms), STT model and TTS voice **pre-warmed** at startup, and per-turn latency instrumentation (`onTurnMetrics` / `VOICE_DEBUG`). New headline metric: `timeToFirstAudioMs` (speech-end → first spoken audio).
+## Future Phases
 
-Planned voice improvements (not in V2): wake word, continuous listening, advanced voice activity detection, streaming STT/TTS, interruption/barge-in, emotional speech synthesis, and streaming the `ChatService` LLM response into the TTS (the remaining dominant latency source, gated on touching the Arcon core).
+The following are planned but not yet implemented:
+
+- Semantic vector search for memory retrieval
+- Graph-based entity relationship reasoning
+- Goal management system
+- Planning engine
+- Proactive conversations
+- Web learning with external evidence attachment
+- Computer interaction / screen awareness
+- Autonomous workflows
+- Multi-agent collaboration
+- Voice conversation (full integration)
+- Desktop application
+- Memory decay engine
+- Automatic memory merge
+- Wake word / continuous listening
+- Advanced VAD
+- Streaming STT/TTS pipeline

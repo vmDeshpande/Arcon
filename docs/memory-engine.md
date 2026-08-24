@@ -2,7 +2,7 @@
 
 ## Status
 
-Design proposal for Phase 2 review. This document does not define implementation code, migrations, or API endpoints.
+Historical design proposal. This document describes the original design thinking for the Arcon memory engine. The implementation has evolved significantly since this was written. For the current architecture, see [architecture.md](../architecture.md) and [ARCON_ARCHITECTURE_AUDIT_2026-08-24.md](../ARCON_ARCHITECTURE_AUDIT_2026-08-24.md).
 
 ## 1. Memory Philosophy
 

@@ -14,7 +14,7 @@
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript)
 ![Node.js](https://img.shields.io/badge/Node.js-20+-green?logo=node.js)
-![Ollama](https://img.shields.io/badge/Ollama-Local%20LLMs-black)
+![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)
 ![SQLite](https://img.shields.io/badge/SQLite-Database-blue)
 ![Status](https://img.shields.io/badge/Status-Active%20Development-orange)
 ![License](https://img.shields.io/github/license/vmDeshpande/Arcon)
@@ -104,6 +104,7 @@ Every memory has:
 * importance
 * timestamps
 * status
+* evidence count
 
 Knowledge should always be auditable.
 
@@ -138,40 +139,54 @@ Those are very different things.
                 Web UI / CLI
                       │
                       ▼
-             Node.js Arcon Runtime
+           Node.js Arcon Runtime
+           (apps/server + packages/*)
                       │
                       ▼
-            Cognitive Processing Layer
-            ┌─────────────────────────┐
-            │ Question Understanding   │
-            │ Context Selection        │
-            │ Relevance Ranking        │
-            │ Conflict Resolution      │
-            └─────────────────────────┘
+           ChatService Orchestration
                       │
                       ▼
-             PromptBuilder
+           Intent / Context Understanding
                       │
                       ▼
-           ArconLoRAProvider
+           Memory Retrieval
+           (status + scope + relevance filtering)
                       │
                       ▼
-        Python Inference Service
+           ContextSnapshot
+           (structured internal state)
                       │
                       ▼
-        Qwen/Qwen3-4B + Arcon V1 LoRA
+           Cognitive Core
+           (intent, strategy, uncertainty, clarification)
+                      │
+                      ▼
+           CognitiveDecision
+           (structured cognitive output)
+                      │
+                      ▼
+           PromptBuilder
+                      │
+                      ▼
+           Python Inference Service
+           (Qwen/Qwen3-4B + Arcon V1 LoRA)
                       │
                       ▼
            Generated Response
                       │
-          ┌────────────┴────────────┐
-          ▼                         ▼
-   User Response          State Updates
-                               ▼
-                  Memory / Emotion /
-                  Interests / Experiences
-                               ▼
-                          Persistence
+           ┌──────────┴──────────┐
+           ▼                     ▼
+    User Response       Experience Recording
+                                ▼
+                       Reflection / Consolidation
+                       (background, auditable)
+                                ▼
+                       MemoryPipeline
+                       (CREATE / UPDATE / SUPERSEDE / ARCHIVE)
+                                ▼
+                       Validated Memory
+                                ▼
+                       future retrieval
 ```
 
 The runtime never returns raw context as a response. The model remains responsible for natural-language understanding, reasoning, and response generation. Runtime systems are responsible for context retrieval, state management, persistence, and cognitive preparation.
@@ -184,18 +199,29 @@ The runtime never returns raw context as a response. The model remains responsib
 
 Arcon separates short-term conversation history from long-term personal memory.
 
+Memory lifecycle states:
+
+* **ACTIVE** — current, valid memory
+* **ARCHIVED** — intentionally hidden but preserved
+* **OBSOLETE** — outdated information
+* **CONTRADICTED** — conflicting information exists
+* **PENDING_CONFIRMATION** — awaiting validation
+* **SUPERSEDED** — replaced by newer memory (lineage preserved via `supersedesId`)
+
 Current capabilities include:
 
-* Personal memory repository
-* Semantic memory extraction
-* Memory validation
-* Confidence scoring
-* Importance scoring
-* Memory review pipeline
+* Personal memory repository (SQLite)
+* Memory pipeline with lifecycle enforcement
+* Semantic memory extraction (LLM + regex fallback)
+* Memory validation and normalisation
+* Confidence scoring (0.0–1.0)
+* Importance scoring (1–10)
 * Conflict detection
 * Duplicate detection
-* Memory retrieval
-* Context building
+* Scope-based access control
+* Supersession with lineage preservation
+* Selective retrieval with relevance threshold
+* Context building via `ContextSnapshot`
 
 ---
 
@@ -254,264 +280,23 @@ These values evolve over time and influence behaviour naturally rather than thro
 
 Events are stored as experiences rather than discarded.
 
-Future systems will use experiences for:
+Current capabilities include:
 
-* reflection
-* learning
-* behavioural adaptation
-* long-term growth
-
----
-
-## Reasoning
-
-Current reasoning consists of specialised recall modules.
-
-Examples:
-
-* Identity recall
-* Project recall
-* Relationship recall
-
-This is only the beginning.
-
-Future versions will introduce a dedicated reasoning engine capable of forming internal conclusions before generating responses.
+* Experience counting by type
+* Context/provenance tracking
+* Background reflection trigger
+* Pattern detection for preferences, projects, relationships, and frustration
+* Proposals for memory changes through the existing lifecycle
 
 ---
 
-# Repository Structure
-
-```text
-apps/
- ├── chat/
- ├── desktop/
- └── server/
-
-packages/
- ├── ai/
- ├── logger/
- ├── memory/
- ├── personality/
- ├── shared/
- └── voice/
-
-docs/
-
-data/
-```
-
----
-
-# Package Overview
-
-| Package         | Purpose                                                                  |
-| --------------- | ------------------------------------------------------------------------ |
-| **ai**          | Chat orchestration, prompt generation, semantic extraction and reasoning |
-| **memory**      | Personal memory, retrieval, entity graph and knowledge management        |
-| **personality** | Identity, emotions, curiosity, interests, mood and behaviour             |
-| **logger**      | Structured runtime logging                                               |
-| **shared**      | Shared interfaces and common types                                       |
-| **voice**       | Future voice interaction                                                 |
-
----
-
-# Technology Stack
-
-* TypeScript
-* Node.js
-* SQLite
-* Ollama
-* Express
-* Better SQLite3
-
----
-
-# Current Development Status
-
-## ✅ Implemented
-
-* Local chat foundation
-* Arcon LoRA inference backend (Qwen3-4B + Arcon V1)
-* Personal memory repository
-* Semantic memory extraction with think-token handling
-* Regex fallback extraction
-* Memory pipeline
-* Memory validation
-* Entity graph
-* Knowledge builder
-* Relationship modelling
-* Emotional state
-* Mood engine
-* Curiosity engine
-* Interest engine (user + Arcon, separated)
-* Experience tracking
-* Prompt builder
-* Context retrieval
-* **Cognitive processing layer** (question understanding, context selection, relevance ranking)
-* **Context contamination prevention**
-* **Conversation persistence across restarts**
-
----
-
-## 🚧 In Progress
-
-* Better reasoning
-* Reflection engine
-* Improved retrieval
-* Internal planning
-
----
-
-## 📅 Planned
-
-* Learning from experience
-* Goal management
-* Planning engine
-* Screen awareness
-* Computer interaction
-* Voice conversation
-* Desktop application
-* Autonomous workflows
-* Multi-agent collaboration
-
----
-
-# Development Philosophy
-
-Arcon is intentionally developed in phases.
-
-Each subsystem is designed, reviewed and stabilised before becoming part of the larger cognitive architecture.
-
-The goal is **not** to add as many AI features as possible.
-
-The goal is to build systems that can continue evolving for years without becoming unmaintainable.
-
----
-
-# Getting Started
-
-## Requirements
-
-* Node.js 20+
-* npm
-* Python 3.11+
-* NVIDIA GPU with CUDA (for inference)
-* Qwen/Qwen3-4B model (downloaded automatically by transformers)
-* Arcon V1 LoRA adapter (included in `training/outputs/arcon-v1/adapter/`)
-
----
-
-## Installation
-
-```bash
-git clone https://github.com/vmDeshpande/Arcon.git
-
-cd Arcon
-
-npm install
-
-cp .env.example .env
-```
-
-Build all packages:
-
-```bash
-npm run build
-```
-
----
-
-## Running Arcon
-
-Arcon requires two processes:
-
-**Terminal 1 — Python inference service:**
-
-```powershell
-# Windows
-$env:ARCON_BASE_MODEL = "Qwen/Qwen3-4B"
-$env:ARCON_ADAPTER_PATH = "training/outputs/arcon-v1/adapter"
-$env:ARCON_ADAPTER_NAME = "arcon-v1"
-
-python services/arcon-inference/main.py
-```
-
-```bash
-# macOS / Linux
-export ARCON_BASE_MODEL="Qwen/Qwen3-4B"
-export ARCON_ADAPTER_PATH="training/outputs/arcon-v1/adapter"
-export ARCON_ADAPTER_NAME="arcon-v1"
-
-python services/arcon-inference/main.py
-```
-
-The inference service listens on `http://127.0.0.1:8000`.
-
-**Terminal 2 — Node.js runtime:**
-
-```powershell
-# Windows
-$env:ARCON_INFERENCE_BACKEND = "arcon-lora"
-$env:ARCON_INFERENCE_BASE_URL = "http://127.0.0.1:8000"
-$env:ARCON_ADAPTER_NAME = "arcon-v1"
-
-npm start
-```
-
-```bash
-# macOS / Linux
-export ARCON_INFERENCE_BACKEND="arcon-lora"
-export ARCON_INFERENCE_BASE_URL="http://127.0.0.1:8000"
-export ARCON_ADAPTER_NAME="arcon-v1"
-
-npm start
-```
-
-The Node.js server listens on `http://127.0.0.1:3000` (or `PORT` from `.env`).
-
----
-
-## Development
-
-```bash
-npm run dev
-```
-
----
-
-## Verification
-
-```bash
-# Health check
-curl http://127.0.0.1:8000/health
-
-# Model info
-curl http://127.0.0.1:8000/v1/models
-
-# Chat
-curl -X POST http://127.0.0.1:3000/chat -H "Content-Type: application/json" -d "{\"message\":\"Hello Arcon\"}"
-```
-
----
-
-# Documentation
-
-Project documentation can be found in the `docs/` directory.
-
-* Architecture
-* Design decisions
-* Memory engine
-* Roadmap
-
----
-
-# Cognitive Layer
+## Cognitive Core
 
 Arcon now includes a dedicated cognitive processing stage between user input and model generation.
 
-## Question Understanding
+### Question Understanding
 
-Before retrieving context, the `CognitiveProcessor` classifies the user's intent and determines what information is relevant.
+Before retrieving context, the cognitive layer classifies the user's intent and determines what information is relevant.
 
 Supported intent categories:
 
@@ -524,41 +309,180 @@ Supported intent categories:
 * `CONVERSATION` — questions about conversation history
 * `GENERAL` — all other questions
 
-## Context Selection
+### Structured Cognitive Decisions
 
-Based on the understood intent, the cognitive layer selects which context sources to include:
+The cognitive layer produces `CognitiveDecision` objects containing:
 
-* Arcon identity
-* Emotional state
-* Arcon interests
-* User profile / user interests
-* Project memories
-* Long-term memories
-* Recent conversation
-* Relevant past conversations
+* `thought` — internal reasoning summary (not exposed to user)
+* `decision` — type, confidence, reason
+* `strategy` / `strategyReason` — response approach
+* `tone` — conversational tone
+* `clarificationNeeded` — whether more information is required
+* `responseMode` — how to construct the response
+* `requiredContext` — what context is missing
+* `unresolvedConflicts` — contradictions needing handling
+* `stages` — processing stage metadata
 
-Each intent has strict limits on how much context is retrieved. For example, an identity question does not pull in project memories or unrelated user interests.
+### Clarification Routing
 
-## Context Contamination Prevention
+When context is insufficient, the cognitive layer can request clarification without invoking full answer generation.
 
-The cognitive layer prevents context contamination by:
+### Runtime Identity Grounding
 
-* Retrieving only memories relevant to the current question
-* Limiting the number of memories and conversation turns per intent
-* Excluding unrelated topics (e.g., Unity project details from a question about binary search trees)
-* Resolving conflicts between old and new information in favor of recency
+The system prompt includes a `RUNTIME CAPABILITIES:` section grounded in actual runtime state (SQLite-backed memory, no web search/tools).
 
-## Runtime vs Model Responsibility
+---
+
+## Reasoning
+
+Current reasoning consists of structured cognitive decisions and processing stages.
+
+Examples:
+
+* Intent classification
+* Context selection
+* Strategy determination
+* Clarification needs
+* Conflict resolution
+
+Future versions will introduce a dedicated reasoning engine capable of forming internal conclusions before generating responses.
+
+---
+
+## Reflection
+
+Reflection examines accumulated experiences and proposes changes to the existing memory system.
 
 ```text
-RUNTIME = context, state, persistence, retrieval, cognition preparation
-
-MODEL = natural-language understanding, reasoning, interpretation, response generation
-
-UI = presentation
+Experience
+  ↓
+ReflectionEngine
+  ↓
+ReflectionCandidate (with evidence/provenance)
+  ↓
+ReflectionProcessor
+  ↓
+MemoryPipeline
+  ↓
+Validated memory change
 ```
 
-The runtime prepares focused context. The model generates the response. The runtime never returns raw context as a conversational answer.
+Key principles:
+
+* Reflection proposes; MemoryPipeline decides
+* Every proposal retains evidence (experience type, count, timestamps, context)
+* Weak evidence does not create strong persistent memories
+* Reflection runs asynchronously without blocking chat
+* Historical memory is preserved; supersession maintains lineage
+
+---
+
+# Repository Structure
+
+```text
+apps/
+ ├── server/           # Canonical Express runtime
+ └── desktop/          # Desktop UI (out of scope)
+
+packages/
+ ├── ai/               # Chat orchestration, cognitive core, prompt building, inference
+ ├── cognition/        # Reasoning engine, intent plugins, strategy plugins
+ ├── logger/           # Structured runtime logging
+ ├── memory/           # SQLite repositories, memory pipeline, retrieval, reflection
+ ├── personality/      # Identity, emotions, mood, interests, experiences
+ ├── shared/           # Shared interfaces and common types
+ └── voice/            # Voice interface layer (STT/TTS)
+
+services/
+ └── arcon-inference/  # Python FastAPI inference service
+
+training/              # LoRA/QLoRA training scripts and datasets
+
+docs/                  # Architecture, design decisions, specifications
+```
+
+---
+
+# Package Overview
+
+| Package | Responsibility |
+|---------|---------------|
+| **ai** | Chat orchestration, cognitive core, prompt generation, inference provider |
+| **cognition** | Reasoning engine, intent plugins, strategy plugins |
+| **memory** | SQLite repositories, memory pipeline, retrieval, reflection, entity graph |
+| **personality** | Identity, emotions, mood, interests, experiences |
+| **logger** | Structured runtime logging |
+| **shared** | Shared interfaces and common types |
+| **voice** | Voice interface layer (STT/TTS) |
+
+---
+
+# Technology Stack
+
+* TypeScript
+* Node.js
+* Python 3.11+
+* SQLite (better-sqlite3)
+* Qwen/Qwen3-4B + LoRA
+* Express
+* FastAPI (inference service)
+
+---
+
+# Current Development Status
+
+## ✅ Implemented
+
+* Local chat foundation (canonical Express runtime)
+* Arcon LoRA inference backend (Qwen3-4B + Arcon V1)
+* Personal memory repository with lifecycle states
+* Semantic memory extraction with think-token handling
+* Regex fallback extraction
+* Memory pipeline (CREATE / UPDATE / SUPERSEDE / ARCHIVE / IGNORE / CONFLICT)
+* Memory validation and normalisation
+* Entity graph
+* Knowledge builder
+* Relationship modelling
+* Emotional state
+* Mood engine
+* Curiosity engine
+* Interest engine (user + Arcon, separated)
+* Experience tracking with provenance
+* **ContextSnapshot** — structured internal state for context
+* **CognitiveDecision** — structured cognitive output
+* **Cognitive Core** — intent classification, strategy, clarification routing
+* **Context contamination prevention**
+* **Supersession with lineage preservation**
+* **Memory scope enforcement**
+* **Reflection and consolidation** — background, auditable, through MemoryPipeline
+* **Clarification questions** when context is insufficient
+* **Runtime identity/capability grounding**
+* **Conversation persistence across restarts**
+
+---
+
+## 🚧 In Progress
+
+* Better reasoning (structured cognitive decisions exist; deeper reasoning in progress)
+* Improved retrieval (semantic vector search deferred)
+* Goal management
+* Planning engine
+
+---
+
+## 📅 Planned
+
+* Learning from experience (reflection exists; deeper learning patterns planned)
+* Screen awareness
+* Computer interaction
+* Voice conversation (interface layer exists; full integration planned)
+* Desktop application
+* Autonomous workflows
+* Multi-agent collaboration
+* Semantic vector search
+* Memory decay engine
+* Automatic memory merge
+* Proactive conversations
 
 ---
 
@@ -571,34 +495,37 @@ User message
   → Semantic memory extraction (LLM)
   → Validation & normalisation
   → Entity resolution
-  → Memory pipeline (create / update / ignore)
+  → Memory pipeline (create / update / supersede / archive / ignore / conflict)
   → Persistence (SQLite)
   → Retrieval (on next question)
   → Cognitive context selection
+  → ContextSnapshot
   → PromptBuilder
   → Model generation
 ```
 
 ## Storage
 
-Memories are stored in `data/memories/personal-memory.sqlite`. Each memory has:
+Memories are stored in SQLite files. Each memory has:
 
 * type (FACT, PREFERENCE, PROJECT, GOAL, RELATIONSHIP, CONSTRAINT)
-* status (ACTIVE, ARCHIVED, OBSOLETE, CONTRADICTED, PENDING_CONFIRMATION)
+* status (ACTIVE, ARCHIVED, OBSOLETE, CONTRADICTED, PENDING_CONFIRMATION, SUPERSEDED)
 * content
 * importance score (1–10)
 * confidence score (0–1)
 * source type (USER_EXPLICIT, USER_CONFIRMED, INFERRED, SYSTEM_OBSERVED)
+* scope (USER, ARCON, PROJECT, ENTITY, CONVERSATION)
 * timestamps
 * evidence count
+* supersedes_id (lineage link)
 
 ## Retrieval
 
-`MemoryRetriever` ranks memories by keyword relevance, importance, confidence, evidence count, and recency. The cognitive layer then selects only the highest-relevance memories for the current question.
+`MemoryRetriever` applies SQL-level prefiltering by status and scope, then ranks memories by keyword relevance, importance, confidence, evidence count, and recency. An explicit relevance threshold excludes weak matches. The cognitive layer then selects only the highest-relevance memories for the current question.
 
 ## Persistence
 
-Memories persist across Node.js restarts because they are stored in SQLite files, not in-memory state.
+All runtime state — conversations, memories, emotions, mood, interests, experiences, entities — is persisted in SQLite files under `data/` or `apps/server/data/`. State survives Node.js restarts.
 
 ---
 
@@ -623,7 +550,7 @@ Maintains two separate interest stores:
 
 ## Persistence
 
-Emotional state, mood, and interests are persisted in `data/memories/personal-memory.sqlite` and `data/mood.sqlite`.
+Emotional state, mood, and interests are persisted in SQLite files.
 
 ---
 
@@ -676,6 +603,9 @@ Memory retrieval, persistence, and context selection are all verified working. H
 * Context selection is deterministic per intent category; it does not dynamically rank individual memories by semantic similarity to the question.
 * The system requires a CUDA-enabled GPU for inference.
 * The model occasionally outputs `<think>` tokens, which are stripped before display but may affect generation quality.
+* No semantic vector search is implemented.
+* Reflection pattern detection is conservative and does not use LLM-based synthesis.
+* No memory decay or automatic merge is implemented.
 
 ---
 
@@ -683,9 +613,11 @@ Memory retrieval, persistence, and context selection are all verified working. H
 
 ## Unit Tests
 
-* `@arcon/ai`: **32/32 passing**
-* `@arcon/memory`: **93/93 passing**
+* `@arcon/ai`: **32/32 passing** (includes cognitive core tests)
+* `@arcon/memory`: **93/93 passing** (includes reflection tests)
 * `@arcon/personality`: **44/44 passing**
+* `@arcon/cognition`: **43/43 passing**
+* `@arcon/voice`: **40/40 passing**
 
 ## Verified Integration Behaviour
 
@@ -698,6 +630,8 @@ Memory retrieval, persistence, and context selection are all verified working. H
 * Returning to previous topics recalls earlier context correctly
 * Restart persistence survives Node.js server restarts
 * Clarification questions are asked when context is insufficient
+* Supersession preserves historical lineage
+* Reflection proposals route through MemoryPipeline with evidence
 
 ---
 
@@ -709,7 +643,7 @@ The project is moving toward a complete cognitive architecture.
 Foundation
         │
         ▼
-Memory
+Memory (Phase B — COMPLETE)
         │
         ▼
 Personality
@@ -718,10 +652,16 @@ Personality
 Entity Knowledge
         │
         ▼
-Reasoning
+Retrieval + Context Selection (Phase C — COMPLETE)
         │
         ▼
-Reflection
+Cognitive Core (Phase D — COMPLETE)
+        │
+        ▼
+Reflection + Consolidation (Phase E — COMPLETE)
+        │
+        ▼
+Reasoning
         │
         ▼
 Planning
@@ -732,6 +672,22 @@ Computer Interaction
         ▼
 Persistent Digital Companion
 ```
+
+---
+
+# Documentation
+
+Project documentation can be found in the `docs/` directory.
+
+* [Architecture](docs/architecture.md)
+* [Design decisions](docs/decisions.md)
+* [Memory engine](docs/memory-engine.md)
+* [Roadmap](docs/roadmap.md)
+* [Cognitive specification](docs/arcon-cognitive-specification.md)
+* [Training specification](docs/arcon-training-specification.md)
+* [Dataset design](docs/arcon-dataset-design.md)
+* [Evaluation specification](docs/arcon-evaluation-specification.md)
+* [Architecture audit 2026-08-24](docs/ARCON_ARCHITECTURE_AUDIT_2026-08-24.md)
 
 ---
 

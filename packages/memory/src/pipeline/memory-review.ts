@@ -1,9 +1,9 @@
-import { MemoryType } from "../personal-memory.js";
+import { MemoryType, MemoryStatus } from "../personal-memory.js";
 import type { Memory } from "../personal-memory.js";
 import type { MemoryCandidate } from "../extractor/candidate.js";
 import { normalizeRelationshipContent } from "../entity/entity-relationship-extractor.js";
 
-export type MemoryReviewDecision = "CREATE" | "UPDATE" | "IGNORE" | "CONFLICT";
+export type MemoryReviewDecision = "CREATE" | "UPDATE" | "IGNORE" | "CONFLICT" | "SUPERSEDE";
 
 export interface MemoryReview {
   decision: MemoryReviewDecision;
@@ -58,6 +58,13 @@ export function reviewCandidate(candidate: MemoryCandidate, existingMemories: Me
   const bestMatch = findBestMatch(candidate, relevant);
   if (!bestMatch) {
     return { decision: "CREATE" };
+  }
+
+  if (isSupersession(candidate, bestMatch.memory)) {
+    return {
+      decision: "SUPERSEDE",
+      targetMemory: bestMatch.memory
+    };
   }
 
   if (isConflict(candidate, bestMatch.memory)) {
@@ -127,6 +134,46 @@ function isConflict(candidate: MemoryCandidate, memory: Memory): boolean {
   }
 
   return false;
+}
+
+function isSupersession(candidate: MemoryCandidate, memory: Memory): boolean {
+  const similarity = calculateSimilarity(candidate.content, memory.content);
+  if (similarity < 0.35 || similarity >= 0.85) {
+    return false;
+  }
+
+  const candidateLower = candidate.content.toLowerCase();
+  const memoryLower = memory.content.toLowerCase();
+
+  const replacementIndicators = [
+    /moved\s+from/,
+    /moved\s+to/,
+    /no\s+longer/,
+    /changed\s+from/,
+    /changed\s+to/,
+    /switched\s+from/,
+    /switched\s+to/,
+    /instead\s+of/,
+    /used\s+to/,
+    /formerly/,
+    /previously/,
+  ];
+
+  const hasReplacementIndicator = replacementIndicators.some((regex) => regex.test(candidateLower));
+
+  if (!hasReplacementIndicator) {
+    return false;
+  }
+
+  const candidateWords = new Set(tokenize(candidateLower));
+  const memoryWords = new Set(tokenize(memoryLower));
+  const sharedTokens = [...candidateWords].filter((token) => memoryWords.has(token));
+
+  if (sharedTokens.length === 0) {
+    return false;
+  }
+
+  return true;
 }
 
 function extractPreferenceDetails(content: string) {

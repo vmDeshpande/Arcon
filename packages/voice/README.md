@@ -159,13 +159,11 @@ python -c "import piper; print('piper ok')"   # optional, for natural voice
 ## Environment variables
 
 | Variable | Default | Description |
-|---|---|---|
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Arcon LLM endpoint (unchanged from text mode). |
-| `OLLAMA_MODEL` | `qwen3:1.7b` | Arcon LLM model (unchanged from text mode). |
+||---|---|
 | `PIPER_VOICE_MODEL` | `en_US-amy-medium` | Piper voice (repo-relative path under `rhasspy/piper-voices`, without the `.onnx` extension). Used by the CLI. |
 | `VOICE_DEBUG` | (unset) | Set to any truthy value to print per-stage latency metrics to stderr each turn. |
 
-These are the same `OLLAMA_*` variables the text chat uses — voice reuses the exact same `ChatService` path. `PIPER_VOICE_MODEL` and `VOICE_DEBUG` are voice-mode only.
+Voice reuses the existing `ChatService` path. `PIPER_VOICE_MODEL` and `VOICE_DEBUG` are voice-mode only.
 
 ### Measuring latency
 
@@ -190,10 +188,10 @@ npm run dev:voice -w @arcon/chat
 
 ## How to start voice mode
 
-Voice mode extends the existing chat CLI in `apps/chat`:
+Voice mode extends the existing chat CLI in `apps/server`:
 
 ```bash
-npm run dev:voice -w @arcon/chat
+npm run dev:voice -w @arcon/server
 ```
 
 Then at the prompt:
@@ -264,11 +262,11 @@ A turn is also instrumented via `VoiceTurnMetrics` (record/stt/chat/tts duration
 - No wake word — a turn is started on demand from the CLI.
 - Piper's Python worker synthesizes one sentence at a time (sequential synthesis), but playback of consecutive sentences overlaps with synthesis of the next, providing pipelined low-latency output.
 - The STT model runs on CPU only; a GPU-accelerated GPU backend would reduce transcription time further but is not required.
-- The LLM (Ollama) runs on CPU by default; first-token latency for `qwen3:1.7b` on CPU is typically ~3.5 s. Using a GPU-enabled Ollama would reduce this significantly.
+- The LLM (inference service) runs on CPU by default; first-token latency on CPU is typically several seconds. Using a GPU-enabled inference service would reduce this significantly.
 
 ## Latency measurements
 
-Baseline (measured with `qwen3:1.7b` on CPU, Piper `en_US-amy-medium`, faster-whisper `tiny`):
+Baseline (measured with Qwen3-4B on CPU, Piper `en_US-amy-medium`, faster-whisper `tiny`):
 
 ```
 BEFORE (Voice V1):

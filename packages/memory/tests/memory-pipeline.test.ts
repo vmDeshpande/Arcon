@@ -33,8 +33,8 @@ describe("MemoryPipeline", () => {
     pipeline = new MemoryPipeline(repository);
   });
 
-  it("creates a new memory", () => {
-    const result = pipeline.processMessage(
+  it("creates a new memory", async () => {
+    const result = await pipeline.processMessage(
       "My favorite language is TypeScript",
     );
 
@@ -50,10 +50,10 @@ describe("MemoryPipeline", () => {
     assert(memories[0].content.includes("TypeScript"));
   });
 
-  it("ignores exact duplicate memories", () => {
-    pipeline.processMessage("My favorite language is TypeScript");
+  it("ignores exact duplicate memories", async () => {
+    await pipeline.processMessage("My favorite language is TypeScript");
 
-    const result = pipeline.processMessage(
+    const result = await pipeline.processMessage(
       "My favorite language is TypeScript",
     );
 
@@ -61,8 +61,8 @@ describe("MemoryPipeline", () => {
     assert.strictEqual(result.ignored, 1);
   });
 
-  it("normalizes relationship synonyms before storing duplicates", () => {
-    const first = pipeline.processCandidates([
+  it("normalizes relationship synonyms before storing duplicates", async () => {
+    const first = await pipeline.processCandidates([
       {
         type: MemoryType.RELATIONSHIP,
         content: "User's father is Milind",
@@ -73,7 +73,7 @@ describe("MemoryPipeline", () => {
       },
     ]);
 
-    const second = pipeline.processCandidates([
+    const second = await pipeline.processCandidates([
       {
         type: MemoryType.RELATIONSHIP,
         content: "User's dad is Milind",
@@ -96,8 +96,8 @@ describe("MemoryPipeline", () => {
     assert.strictEqual(relationships[0].content, "User's father is Milind");
   });
 
-  it("drops blocked self-identity action relationships before storage", () => {
-    const result = pipeline.processCandidates([
+  it("drops blocked self-identity action relationships before storage", async () => {
+    const result = await pipeline.processCandidates([
       {
         type: MemoryType.RELATIONSHIP,
         content: "User's self is building",
@@ -117,8 +117,8 @@ describe("MemoryPipeline", () => {
     assert.strictEqual(relationships.length, 0);
   });
 
-  it("drops redundant identity fact memories before storage", () => {
-    const result = pipeline.processCandidates([
+  it("drops redundant identity fact memories before storage", async () => {
+    const result = await pipeline.processCandidates([
       {
         type: MemoryType.FACT,
         content: "Vedant's name is Vedant",
@@ -149,8 +149,8 @@ describe("MemoryPipeline", () => {
     assert.strictEqual(repository.listMemories().length, 0);
   });
 
-  it("drops standalone entity declaration memories before storage", () => {
-    const result = pipeline.processCandidates([
+  it("drops standalone entity declaration memories before storage", async () => {
+    const result = await pipeline.processCandidates([
       {
         type: MemoryType.PROJECT,
         content: "Arcon",
@@ -181,8 +181,8 @@ describe("MemoryPipeline", () => {
     assert.strictEqual(repository.listMemories().length, 0);
   });
 
-  it("keeps meaningful identity, family, and project memories", () => {
-    const result = pipeline.processCandidates([
+  it("keeps meaningful identity, family, and project memories", async () => {
+    const result = await pipeline.processCandidates([
       {
         type: MemoryType.RELATIONSHIP,
         content: "User's self is Vedant",
@@ -229,7 +229,7 @@ describe("MemoryPipeline", () => {
     );
   });
 
-  it("reinforces an existing memory", () => {
+  it("reinforces an existing memory", async () => {
     repository.createMemory({
       type: MemoryType.PREFERENCE,
       content: "User prefers TypeScript",
@@ -238,7 +238,7 @@ describe("MemoryPipeline", () => {
       sourceType: MemorySourceType.USER_EXPLICIT,
     });
 
-    const result = pipeline.processMessage("I prefer TypeScript");
+    const result = await pipeline.processMessage("I prefer TypeScript");
 
     assert.strictEqual(result.ignored, 1);
 
@@ -254,7 +254,7 @@ describe("MemoryPipeline", () => {
     assert(memory.evidenceCount >= 1);
   });
 
-  it("creates pending confirmation memory on conflict", () => {
+  it("creates pending confirmation memory on conflict", async () => {
     repository.createMemory({
       type: MemoryType.PREFERENCE,
       content: "User prefers JavaScript",
@@ -263,7 +263,7 @@ describe("MemoryPipeline", () => {
       sourceType: MemorySourceType.USER_EXPLICIT,
     });
 
-    const result = pipeline.processMessage(
+    const result = await pipeline.processMessage(
       "My favorite language is TypeScript",
     );
 
@@ -278,8 +278,8 @@ describe("MemoryPipeline", () => {
     assert(memories.some((m) => m.content.includes("TypeScript")));
   });
 
-  it("creates multiple memories from one message", () => {
-    const result = pipeline.processMessage(
+  it("creates multiple memories from one message", async () => {
+    const result = await pipeline.processMessage(
       "I use Windows 11 and my goal is to build Arcon",
     );
 
@@ -297,10 +297,102 @@ describe("MemoryPipeline", () => {
     assert.strictEqual(goals.length, 1);
   });
 
-  it("rejects invalid messages", () => {
-    const result = pipeline.processMessage("Hi");
+  it("rejects invalid messages", async () => {
+    const result = await pipeline.processMessage("Hi");
 
     assert.strictEqual(result.created, 0);
     assert(result.rejected > 0);
+  });
+
+  it("does not update superseded memories from stale evidence", async () => {
+    repository.createMemory({
+      type: MemoryType.PREFERENCE,
+      content: "User prefers JavaScript",
+      importanceScore: 6,
+      confidenceScore: 0.9,
+      sourceType: MemorySourceType.USER_EXPLICIT,
+      status: MemoryStatus.SUPERSEDED,
+    });
+
+    const result = await pipeline.processMessage(
+      "My favorite language is TypeScript",
+    );
+
+    assert.strictEqual(result.updated, 0);
+    assert.strictEqual(result.ignored, 0);
+    assert.strictEqual(result.created, 1);
+
+    const memories = repository.listMemories({
+      type: MemoryType.PREFERENCE,
+    });
+
+    assert.strictEqual(memories.length, 2);
+    const superseded = memories.find((m) => m.status === MemoryStatus.SUPERSEDED);
+    assert(superseded, "expected a SUPERSEDED memory to remain");
+    assert.strictEqual(superseded.content, "User prefers JavaScript");
+  });
+
+  it("does not update contradicted memories from stale evidence", async () => {
+    repository.createMemory({
+      type: MemoryType.FACT,
+      content: "User uses JavaScript",
+      importanceScore: 6,
+      confidenceScore: 0.9,
+      sourceType: MemorySourceType.USER_EXPLICIT,
+      status: MemoryStatus.CONTRADICTED,
+    });
+
+    const result = await pipeline.processCandidates([
+      {
+        type: MemoryType.FACT,
+        content: "User uses TypeScript",
+        confidenceScore: 0.95,
+        importanceScore: 8,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+    ]);
+
+    assert.strictEqual(result.updated, 0);
+    assert.strictEqual(result.created, 1);
+
+    const memories = repository.listMemories({
+      type: MemoryType.FACT,
+    });
+
+    assert.strictEqual(memories.length, 2);
+    const contradicted = memories.find((m) => m.status === MemoryStatus.CONTRADICTED);
+    assert(contradicted, "expected a CONTRADICTED memory to remain");
+    assert.strictEqual(contradicted.content, "User uses JavaScript");
+  });
+
+  it("preserves supersession lineage on new memory", async () => {
+    repository.createMemory({
+      type: MemoryType.PREFERENCE,
+      content: "User prefers Java for backend development",
+      importanceScore: 6,
+      confidenceScore: 0.9,
+      sourceType: MemorySourceType.USER_EXPLICIT,
+    });
+
+    const result = await pipeline.processCandidates([
+      {
+        type: MemoryType.PREFERENCE,
+        content: "User changed from Java to Kotlin for backend development",
+        confidenceScore: 0.95,
+        importanceScore: 8,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+    ]);
+
+    assert.strictEqual(result.created, 1);
+    assert.strictEqual(result.superseded, 1);
+
+    const newMemory = result.createdMemories[0];
+    const oldMemory = result.updatedMemories[0];
+
+    assert.strictEqual(newMemory.supersedesId, oldMemory.id);
+    assert.strictEqual(oldMemory.status, MemoryStatus.SUPERSEDED);
   });
 });

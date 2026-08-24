@@ -1,4 +1,4 @@
-import { MemoryType, MemorySourceType } from "../personal-memory.js";
+import { MemoryScope, MemoryType, MemorySourceType } from "../personal-memory.js";
 
 /**
  * MemoryCandidate represents a potential memory extracted from user input.
@@ -22,6 +22,9 @@ export interface MemoryCandidate {
 
   /** Human-readable reasoning for why this candidate was extracted */
   reasoning: string;
+
+  /** Memory scope (USER, ARCON, PROJECT, ENTITY, CONVERSATION) */
+  scope?: MemoryScope;
 }
 
 /**

@@ -8,4 +8,6 @@ export interface Experience {
   firstSeen: string;
 
   lastSeen: string;
+
+  context?: string;
 }

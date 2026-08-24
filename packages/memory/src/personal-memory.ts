@@ -17,7 +17,8 @@ export enum MemoryStatus {
   ARCHIVED = "ARCHIVED",
   OBSOLETE = "OBSOLETE",
   CONTRADICTED = "CONTRADICTED",
-  PENDING_CONFIRMATION = "PENDING_CONFIRMATION"
+  PENDING_CONFIRMATION = "PENDING_CONFIRMATION",
+  SUPERSEDED = "SUPERSEDED"
 }
 
 export enum MemorySourceType {
@@ -25,6 +26,14 @@ export enum MemorySourceType {
   USER_CONFIRMED = "USER_CONFIRMED",
   INFERRED = "INFERRED",
   SYSTEM_OBSERVED = "SYSTEM_OBSERVED"
+}
+
+export enum MemoryScope {
+  USER = "USER",
+  ARCON = "ARCON",
+  PROJECT = "PROJECT",
+  ENTITY = "ENTITY",
+  CONVERSATION = "CONVERSATION"
 }
 
 export interface Memory {
@@ -42,6 +51,7 @@ export interface Memory {
   evidenceCount: number;
   lastUsedAt?: string;
   supersedesId?: string;
+  scope: MemoryScope;
 }
 
 export interface CreateMemoryInput {
@@ -56,6 +66,7 @@ export interface CreateMemoryInput {
   evidenceCount?: number;
   lastUsedAt?: string;
   supersedesId?: string;
+  scope?: MemoryScope;
 }
 
 export interface UpdateMemoryInput {
@@ -70,11 +81,13 @@ export interface UpdateMemoryInput {
   evidenceCount?: number;
   lastUsedAt?: string | null;
   supersedesId?: string | null;
+  scope?: MemoryScope;
 }
 
 export interface ListMemoriesFilter {
   type?: MemoryType;
   status?: MemoryStatus;
+  scope?: MemoryScope;
 }
 
 interface MemoryRow {
@@ -92,6 +105,7 @@ interface MemoryRow {
   evidence_count: number;
   last_used_at: string | null;
   supersedes_id: string | null;
+  scope: string;
 }
 
 export class MemoryValidationError extends Error {
@@ -112,7 +126,7 @@ export class MemoryRepository {
       CREATE TABLE IF NOT EXISTS personal_memories (
         id TEXT PRIMARY KEY,
         type TEXT NOT NULL CHECK(type IN ('FACT', 'PREFERENCE', 'PROJECT', 'GOAL', 'RELATIONSHIP', 'CONSTRAINT')),
-        status TEXT NOT NULL CHECK(status IN ('ACTIVE', 'ARCHIVED', 'OBSOLETE', 'CONTRADICTED', 'PENDING_CONFIRMATION')),
+        status TEXT NOT NULL CHECK(status IN ('ACTIVE', 'ARCHIVED', 'OBSOLETE', 'CONTRADICTED', 'PENDING_CONFIRMATION', 'SUPERSEDED')),
         content TEXT NOT NULL,
         importance_score INTEGER NOT NULL CHECK(importance_score >= 1 AND importance_score <= 10),
         confidence_score REAL NOT NULL CHECK(confidence_score >= 0 AND confidence_score <= 1),
@@ -124,6 +138,7 @@ export class MemoryRepository {
         evidence_count INTEGER NOT NULL DEFAULT 1 CHECK(evidence_count >= 0),
         last_used_at TEXT,
         supersedes_id TEXT,
+        scope TEXT NOT NULL DEFAULT 'USER',
         FOREIGN KEY (supersedes_id) REFERENCES personal_memories(id)
       );
 
@@ -141,6 +156,9 @@ export class MemoryRepository {
 
       CREATE INDEX IF NOT EXISTS idx_personal_memories_updated
       ON personal_memories (updated_at);
+
+      CREATE INDEX IF NOT EXISTS idx_personal_memories_scope
+      ON personal_memories (scope);
 
       CREATE TABLE IF NOT EXISTS emotions (
         name TEXT PRIMARY KEY,
@@ -167,6 +185,8 @@ export class MemoryRepository {
       ON arcon_interests (weight DESC);
     `);
 
+    this.migrateScopeColumn();
+
     const emotionCount = this.db
       .prepare("SELECT COUNT(*) as count FROM emotions")
       .get() as { count: number };
@@ -191,6 +211,24 @@ export class MemoryRepository {
     }
   }
 
+  private migrateScopeColumn(): void {
+    const columns = this.db
+      .prepare("PRAGMA table_info(personal_memories)")
+      .all() as Array<{ name: string }>;
+
+    const hasScopeColumn = columns.some((column) => column.name === "scope");
+
+    if (!hasScopeColumn) {
+      this.db.exec("ALTER TABLE personal_memories ADD COLUMN scope TEXT NOT NULL DEFAULT 'USER'");
+    }
+  }
+
+  markSuperseded(id: string): Memory | null {
+    return this.updateMemory(id, {
+      status: MemoryStatus.SUPERSEDED,
+    });
+  }
+
   createMemory(input: CreateMemoryInput): Memory {
     validateCreateMemoryInput(input);
 
@@ -209,17 +247,18 @@ export class MemoryRepository {
       tags: normalizeTags(input.tags),
       evidenceCount: input.evidenceCount ?? 1,
       lastUsedAt: normalizeOptionalString(input.lastUsedAt),
-      supersedesId: normalizeOptionalString(input.supersedesId)
+      supersedesId: normalizeOptionalString(input.supersedesId),
+      scope: input.scope ?? MemoryScope.USER,
     };
 
     this.db
       .prepare(
         `INSERT INTO personal_memories (
           id, type, status, content, importance_score, confidence_score, source_type,
-          created_at, updated_at, subject, tags, evidence_count, last_used_at, supersedes_id
+          created_at, updated_at, subject, tags, evidence_count, last_used_at, supersedes_id, scope
         ) VALUES (
           @id, @type, @status, @content, @importanceScore, @confidenceScore, @sourceType,
-          @createdAt, @updatedAt, @subject, @tags, @evidenceCount, @lastUsedAt, @supersedesId
+          @createdAt, @updatedAt, @subject, @tags, @evidenceCount, @lastUsedAt, @supersedesId, @scope
         )`
       )
       .run(toDatabaseParams(memory));
@@ -251,6 +290,7 @@ export class MemoryRepository {
       evidenceCount: input.evidenceCount ?? existing.evidenceCount,
       lastUsedAt: input.lastUsedAt === undefined ? existing.lastUsedAt : normalizeOptionalString(input.lastUsedAt),
       supersedesId: input.supersedesId === undefined ? existing.supersedesId : normalizeOptionalString(input.supersedesId),
+      scope: input.scope ?? existing.scope,
       updatedAt: new Date().toISOString()
     };
 
@@ -270,7 +310,8 @@ export class MemoryRepository {
              tags = @tags,
              evidence_count = @evidenceCount,
              last_used_at = @lastUsedAt,
-             supersedes_id = @supersedesId
+             supersedes_id = @supersedesId,
+             scope = @scope
          WHERE id = @id`
       )
       .run(toDatabaseParams(updated));
@@ -288,11 +329,27 @@ export class MemoryRepository {
   }
 
   listMemories(filter: ListMemoriesFilter = {}): Memory[] {
+    if (filter.type && filter.status && filter.scope) {
+      return (
+        this.db
+          .prepare("SELECT * FROM personal_memories WHERE type = ? AND status = ? AND scope = ? ORDER BY updated_at DESC, created_at DESC")
+          .all(filter.type, filter.status, filter.scope) as MemoryRow[]
+      ).map(toMemory);
+    }
+
     if (filter.type && filter.status) {
       return (
         this.db
           .prepare("SELECT * FROM personal_memories WHERE type = ? AND status = ? ORDER BY updated_at DESC, created_at DESC")
           .all(filter.type, filter.status) as MemoryRow[]
+      ).map(toMemory);
+    }
+
+    if (filter.type && filter.scope) {
+      return (
+        this.db
+          .prepare("SELECT * FROM personal_memories WHERE type = ? AND scope = ? ORDER BY updated_at DESC, created_at DESC")
+          .all(filter.type, filter.scope) as MemoryRow[]
       ).map(toMemory);
     }
 
@@ -302,11 +359,27 @@ export class MemoryRepository {
       ).map(toMemory);
     }
 
+    if (filter.status && filter.scope) {
+      return (
+        this.db
+          .prepare("SELECT * FROM personal_memories WHERE status = ? AND scope = ? ORDER BY updated_at DESC, created_at DESC")
+          .all(filter.status, filter.scope) as MemoryRow[]
+      ).map(toMemory);
+    }
+
     if (filter.status) {
       return (
         this.db
           .prepare("SELECT * FROM personal_memories WHERE status = ? ORDER BY updated_at DESC, created_at DESC")
           .all(filter.status) as MemoryRow[]
+      ).map(toMemory);
+    }
+
+    if (filter.scope) {
+      return (
+        this.db
+          .prepare("SELECT * FROM personal_memories WHERE scope = ? ORDER BY updated_at DESC, created_at DESC")
+          .all(filter.scope) as MemoryRow[]
       ).map(toMemory);
     }
 
@@ -431,7 +504,8 @@ function validateCreateMemoryInput(input: CreateMemoryInput): void {
     tags: normalizeTags(input.tags),
     evidenceCount: input.evidenceCount ?? 1,
     lastUsedAt: input.lastUsedAt,
-    supersedesId: input.supersedesId
+    supersedesId: input.supersedesId,
+    scope: input.scope ?? MemoryScope.USER,
   });
 }
 
@@ -489,7 +563,8 @@ function toDatabaseParams(memory: Memory) {
     tags: JSON.stringify(memory.tags),
     subject: memory.subject ?? null,
     lastUsedAt: memory.lastUsedAt ?? null,
-    supersedesId: memory.supersedesId ?? null
+    supersedesId: memory.supersedesId ?? null,
+    scope: memory.scope,
   };
 }
 
@@ -508,6 +583,7 @@ function toMemory(row: MemoryRow): Memory {
     tags: JSON.parse(row.tags) as string[],
     evidenceCount: row.evidence_count,
     lastUsedAt: row.last_used_at ?? undefined,
-    supersedesId: row.supersedes_id ?? undefined
+    supersedesId: row.supersedes_id ?? undefined,
+    scope: row.scope as MemoryScope,
   };
 }

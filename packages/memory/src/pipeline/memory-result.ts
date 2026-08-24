@@ -6,6 +6,7 @@ export interface PipelineResult {
   updated: number;
   ignored: number;
   rejected: number;
+  superseded: number;
   createdMemories: Memory[];
   updatedMemories: Memory[];
   rejectedCandidates: MemoryCandidate[];

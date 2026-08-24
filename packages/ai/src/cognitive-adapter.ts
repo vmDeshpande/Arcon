@@ -1,17 +1,23 @@
-import { EmotionManager, type Emotions } from "@arcon/personality";
-import { MoodEngine } from "@arcon/personality";
-import { InterestEngine } from "@arcon/personality";
-import { ExperienceManager } from "@arcon/personality";
-import { MemoryRetriever } from "@arcon/memory";
-import { EntityRepository } from "@arcon/memory";
-import { ConversationEntityTracker } from "@arcon/memory";
 import { IntentType } from "./context/intent-classifier.js";
-import { PluginRegistry, ReasoningEngine, Thought, ResponseStrategy, DecisionType, ConfidenceLevel, ReplyStyle } from "@arcon/cognition";
+import {
+  Thought,
+  ResponseStrategy,
+  DecisionType,
+  ConfidenceLevel,
+  ReplyStyle,
+} from "@arcon/cognition";
+import type { ContextSnapshot } from "./cognitive/context-selection.js";
 
 export interface CognitiveInput {
   message: string;
   intent: IntentType;
-  emotions: Emotions;
+  emotions: {
+    happiness: number;
+    frustration: number;
+    curiosity: number;
+    trust: number;
+    confidence: number;
+  };
   moodLabel: string;
   mood: {
     frustration: number;
@@ -27,27 +33,28 @@ export interface CognitiveInput {
   recentExperiences: string[];
   conversationHistory?: string[];
   relevantConversations?: Array<{ conversationId: string; messages: { role: string; content: string }[] }>;
+  snapshot: ContextSnapshot;
 }
 
-export interface CognitiveResult {
+export interface CognitiveDecision {
   thought: Thought;
+  decision: {
+    type: DecisionType;
+    confidence: ConfidenceLevel;
+    reason: string;
+  };
   strategy: ResponseStrategy;
   strategyReason: string;
   tone: string;
+  clarificationNeeded: boolean;
+  responseMode: "answer" | "clarify" | "acknowledge" | "refuse" | "defer";
+  requiredContext: string[];
+  unresolvedConflicts: Array<{ id: string; content: string; status: string }>;
+  stages: Array<{ stage: string; summary: string }>;
 }
 
 export class CognitiveAdapter {
-  constructor(
-    private readonly emotionEngine: EmotionManager,
-    private readonly moodEngine: MoodEngine,
-    private readonly interestEngine: InterestEngine,
-    private readonly experiences: ExperienceManager,
-    private readonly memoryRetriever: MemoryRetriever,
-    private readonly entityRepository: EntityRepository,
-    private readonly conversationTracker: ConversationEntityTracker,
-  ) {}
-
-  async process(input: CognitiveInput): Promise<CognitiveResult> {
+  async process(input: CognitiveInput): Promise<CognitiveDecision> {
     const recentMemories = input.recentMemories.slice(0, 5);
     const memoryIds = recentMemories.map((m) => m.id);
     const entityIds = input.activeEntity?.name ? [input.activeEntity.name] : [];
@@ -99,7 +106,7 @@ export class CognitiveAdapter {
       },
     };
 
-    let result: Thought;
+    let result = thought;
 
     try {
       const { ReasoningPipeline, IntentPlugin, StrategyPlugin } = await import("@arcon/cognition");
@@ -112,11 +119,65 @@ export class CognitiveAdapter {
       result = thought;
     }
 
+    const intentConfidence = result.intent?.confidence ?? 0.5;
+    const retrievalConfidence = input.snapshot.confidence;
+    const hasUnresolvedConflicts = input.snapshot.unresolvedConflicts.length > 0;
+    const hasRelevantMemories = input.snapshot.relevantMemories.length > 0;
+    const isGreeting = result.intent?.goal === "greeting";
+
+    const requiresClarification =
+      (result.intent?.requiresClarification ?? false) ||
+      (!isGreeting && input.snapshot.understanding.confidence < 0.7 && !hasRelevantMemories) ||
+      (!isGreeting && input.snapshot.understanding.isAmbiguous && !hasRelevantMemories) ||
+      (hasUnresolvedConflicts && retrievalConfidence < 0.7);
+
+    const decisionType = requiresClarification
+      ? DecisionType.Clarify
+      : DecisionType.Respond;
+
+    const responseMode = requiresClarification ? "clarify" : "answer";
+
+    const requiredContext: string[] = [];
+    if (input.snapshot.understanding.requiresMemory) requiredContext.push("memory");
+    if (input.snapshot.understanding.requiresIdentity) requiredContext.push("identity");
+    if (input.snapshot.understanding.requiresProjects) requiredContext.push("project");
+    if (input.snapshot.understanding.requiresEmotion) requiredContext.push("emotion");
+    if (input.snapshot.understanding.requiresInterests) requiredContext.push("interests");
+
+    const unresolvedConflicts = input.snapshot.unresolvedConflicts.map((m) => ({
+      id: m.id,
+      content: m.content,
+      status: m.status,
+    }));
+
+    const stages: Array<{ stage: string; summary: string }> = [
+      {
+        stage: "context_selection",
+        summary: `Selected ${input.snapshot.relevantMemories.length} memories for ${input.snapshot.intent} intent`,
+      },
+      {
+        stage: "reasoning",
+        summary: requiresClarification
+          ? "Insufficient or ambiguous context; clarification required"
+          : `Evaluated ${input.snapshot.relevantMemories.length} relevant memories and ${input.snapshot.relevantEntities.length} entities`,
+      },
+    ];
+
     return {
       thought: result,
+      decision: {
+        type: decisionType,
+        confidence: result.decision.confidence,
+        reason: result.decision.reason,
+      },
       strategy: result.responseStrategy ?? ResponseStrategy.Acknowledge,
       strategyReason: result.strategyReason ?? "Default response",
       tone: result.metadata?.tone ?? "neutral",
+      clarificationNeeded: requiresClarification,
+      responseMode,
+      requiredContext,
+      unresolvedConflicts,
+      stages,
     };
   }
 }

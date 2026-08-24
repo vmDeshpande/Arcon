@@ -17,3 +17,34 @@ export interface ContextSelection {
   selectedTopics: string[];
   excludedTopics: string[];
 }
+
+export interface ContextSnapshot {
+  understanding: QuestionUnderstanding;
+  task: string;
+  intent: string;
+  subject: string | null;
+  relevantMemories: Memory[];
+  relevantEntities: Array<{ name: string; type?: string }>;
+  currentEmotionalState: {
+    moodLabel: string;
+    emotions: {
+      happiness: number;
+      frustration: number;
+      curiosity: number;
+      trust: number;
+      confidence: number;
+    };
+  };
+  relevantInterests: Array<{ topic: string; weight: number }>;
+  activeGoals: Memory[];
+  unresolvedConflicts: Memory[];
+  confidence: number;
+  selectedTopics: string[];
+  excludedTopics: string[];
+  contextBudget: {
+    maxMemories: number;
+    maxConversationTurns: number;
+    maxPastConversations: number;
+    estimatedTokens: number;
+  };
+}

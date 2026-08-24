@@ -11,6 +11,11 @@ export * from "./pipeline/memory-pipeline.js";
 export * from "./pipeline/memory-review.js";
 export * from "./pipeline/memory-result.js";
 
+export * from "./reflection/reflection-candidate.js";
+export * from "./reflection/reflection-engine.js";
+export * from "./reflection/reflection-processor.js";
+export * from "./reflection/reflection-trigger.js";
+
 export * from "./semantic/index.js";
 export * from "./entity/index.js";
 

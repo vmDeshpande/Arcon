@@ -3,6 +3,7 @@ import {
   MemoryRepository,
   MemorySourceType,
   MemoryStatus,
+  MemoryScope,
   MemoryType,
 } from "../personal-memory.js";
 import type { Entity } from "../entity/entity.js";
@@ -10,6 +11,22 @@ import { EntityFactRepository } from "../entity/entity-fact-repository.js";
 import { EntityRepository } from "../entity/entity-repository.js";
 import { normalizeRelationshipRelation } from "../entity/entity-relationship-extractor.js";
 import { calculateMemoryScore } from "./memory-ranking.js";
+
+const EXCLUDED_FROM_NORMAL_RETRIEVAL = new Set([
+  MemoryStatus.ARCHIVED,
+  MemoryStatus.OBSOLETE,
+  MemoryStatus.CONTRADICTED,
+  MemoryStatus.PENDING_CONFIRMATION,
+  MemoryStatus.SUPERSEDED,
+]);
+
+export interface RetrieveOptions {
+  limit?: number;
+  minScore?: number;
+  type?: MemoryType;
+  scope?: MemoryScope;
+  status?: MemoryStatus;
+}
 
 export class MemoryRetriever {
   constructor(
@@ -25,25 +42,81 @@ export class MemoryRetriever {
     const entityMemories = this.retrieveEntityMemories(query, limit);
 
     if (entityMemories.length > 0) {
+      this.markUsed(entityMemories);
       return entityMemories;
     }
 
     const memories = this.repository
       .listMemories()
       .filter(
+        (memory) => !EXCLUDED_FROM_NORMAL_RETRIEVAL.has(memory.status)
+      )
+      .filter(
         (memory) =>
-          memory.status !== MemoryStatus.ARCHIVED &&
-          memory.status !== MemoryStatus.OBSOLETE
+          memory.scope === MemoryScope.USER ||
+          memory.scope === MemoryScope.ARCON
       );
 
-    return memories
+    const scored = memories
       .map((memory) => ({
         memory,
         score: calculateMemoryScore(memory, query)
       }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((item) => item.memory);
+      .slice(0, limit);
+
+    this.markUsed(scored.map((item) => item.memory));
+
+    return scored.map((item) => item.memory);
+  }
+
+  retrieveWithThreshold(
+    query: string,
+    options: RetrieveOptions = {}
+  ): Memory[] {
+    const {
+      limit = 10,
+      minScore = 0,
+      type,
+      scope,
+    } = options;
+
+    const entityMemories = this.retrieveEntityMemories(query, limit);
+
+    if (entityMemories.length > 0) {
+      this.markUsed(entityMemories);
+      return entityMemories;
+    }
+
+    const statusFilter = EXCLUDED_FROM_NORMAL_RETRIEVAL;
+    const memories = this.repository
+      .listMemories({ type, scope })
+      .filter(
+        (memory) => !statusFilter.has(memory.status)
+      );
+
+    const scored = memories
+      .map((memory) => ({
+        memory,
+        score: calculateMemoryScore(memory, query)
+      }))
+      .filter((item) => item.score >= minScore)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    this.markUsed(scored.map((item) => item.memory));
+
+    return scored.map((item) => item.memory);
+  }
+
+  private markUsed(memories: Memory[]): void {
+    const now = new Date().toISOString();
+
+    for (const memory of memories) {
+      this.repository.updateMemory(memory.id, {
+        lastUsedAt: now,
+      });
+    }
   }
 
   private retrieveEntityMemories(
@@ -75,15 +148,23 @@ export class MemoryRetriever {
     const storedMemories = this.repository
       .listMemories()
       .filter(
-        (memory) =>
-          memory.status !== MemoryStatus.ARCHIVED &&
-          memory.status !== MemoryStatus.OBSOLETE,
+        (memory) => !EXCLUDED_FROM_NORMAL_RETRIEVAL.has(memory.status)
       )
       .filter((memory) =>
         memory.content.toLowerCase().includes(entity.name.toLowerCase()),
       );
 
-    return this.dedupeMemories([...graphMemories, ...storedMemories]).slice(
+    const entityScoped = this.repository
+      .listMemories({ scope: MemoryScope.ENTITY })
+      .filter(
+        (memory) => !EXCLUDED_FROM_NORMAL_RETRIEVAL.has(memory.status)
+      );
+
+    return this.dedupeMemories([
+      ...graphMemories,
+      ...storedMemories,
+      ...entityScoped,
+    ]).slice(
       0,
       limit,
     );
@@ -193,6 +274,7 @@ export class MemoryRetriever {
       updatedAt: now,
       tags: [],
       evidenceCount: 1,
+      scope: MemoryScope.USER,
     };
   }
 }

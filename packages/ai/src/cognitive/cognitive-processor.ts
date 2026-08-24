@@ -1,12 +1,11 @@
-import { MemoryRepository, MemoryType, MemoryStatus, MemoryRetriever, EntityRepository } from "@arcon/memory";
-import { EmotionManager, MoodEngine, InterestEngine } from "@arcon/personality";
-import { ConversationStore } from "@arcon/memory";
+import { MemoryRetriever, MemoryScope, MemoryType, MemoryStatus } from "@arcon/memory";
+import type { MemoryRepository, ConversationStore, EntityRepository, Memory } from "@arcon/memory";
+import type { EmotionManager, MoodEngine, InterestEngine } from "@arcon/personality";
 import { classifyIntent, IntentType } from "../context/intent-classifier.js";
 import type { QuestionUnderstanding, IntentCategory, QuestionSubject } from "./question-understanding.js";
-import type { ContextSelection } from "./context-selection.js";
-import type { Memory } from "@arcon/memory";
+import type { ContextSelection, ContextSnapshot } from "./context-selection.js";
 
-export type { ContextSelection } from "./context-selection.js";
+export type { ContextSelection, ContextSnapshot } from "./context-selection.js";
 
 function classifyIntentCategory(message: string, existingIntent: IntentType): IntentCategory {
   const text = message.toLowerCase();
@@ -136,6 +135,73 @@ function detectAmbiguity(message: string, intent: IntentCategory): boolean {
   return false;
 }
 
+function extractTopics(message: string): string[] {
+  const words = message
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .split(/\s+/)
+    .filter((w) => w.length > 3);
+
+  const stopwords = new Set([
+    "the", "and", "for", "with", "that", "this", "have", "been",
+    "what", "when", "where", "which", "about", "from", "just",
+    "like", "really", "very", "more", "some", "into", "than",
+  ]);
+
+  return words.filter((w) => !stopwords.has(w)).slice(0, 8);
+}
+
+function getIntentTopics(intent: IntentCategory): { selected: string[]; excluded: string[] } {
+  switch (intent) {
+    case "IDENTITY":
+      return {
+        selected: ["arcon", "identity", "interests", "emotion"],
+        excluded: ["project", "game", "unity"],
+      };
+    case "EMOTION":
+      return {
+        selected: ["emotion", "mood", "feeling", "arcon"],
+        excluded: ["project", "game"],
+      };
+    case "INTEREST":
+      return {
+        selected: ["interest", "curious", "arcon"],
+        excluded: ["project"],
+      };
+    case "USER_INTEREST":
+      return {
+        selected: ["interest", "preference", "like"],
+        excluded: ["arcon"],
+      };
+    case "PROJECT":
+      return {
+        selected: ["project", "building", "working", "game", "app", "system", "arcon"],
+        excluded: [],
+      };
+    case "MEMORY":
+      return {
+        selected: ["memory", "remember", "fact", "preference"],
+        excluded: [],
+      };
+    case "CONVERSATION":
+      return {
+        selected: ["conversation", "talked", "said", "earlier"],
+        excluded: [],
+      };
+    case "CLARIFICATION":
+      return {
+        selected: [],
+        excluded: [],
+      };
+    case "GENERAL":
+    default:
+      return {
+        selected: [],
+        excluded: [],
+      };
+  }
+}
+
 export function analyzeQuestion(message: string): QuestionUnderstanding {
   const existingIntent = classifyIntent(message);
   const intent = classifyIntentCategory(message, existingIntent);
@@ -247,6 +313,11 @@ export function selectContext(
     excludedTopics: [],
   };
 
+  const intentTopics = getIntentTopics(understanding.intent);
+  const messageTopics = extractTopics(message);
+  selection.selectedTopics = [...new Set([...intentTopics.selected, ...messageTopics])];
+  selection.excludedTopics = intentTopics.excluded;
+
   switch (understanding.intent) {
     case "IDENTITY":
       selection.includeArconIdentity = true;
@@ -322,7 +393,12 @@ export function selectContext(
   }
 
   if (understanding.requiresMemory) {
-    const memories = memoryRetriever.retrieveRelevantMemories(message, selection.maxMemories);
+    const memories = memoryRetriever.retrieveWithThreshold(message, {
+      limit: selection.maxMemories,
+      minScore: 12,
+      type: understanding.requiresProjects ? undefined : undefined,
+      scope: understanding.subject === "arcon" ? MemoryScope.ARCON : understanding.subject === "project" ? MemoryScope.PROJECT : undefined,
+    });
     selection.memories = memories;
   }
 
@@ -331,4 +407,70 @@ export function selectContext(
   }
 
   return selection;
+}
+
+export function buildContextSnapshot(
+  selection: ContextSelection,
+  message: string,
+  emotionEngine: EmotionManager,
+  moodEngine: MoodEngine,
+  interestEngine: InterestEngine,
+  repository: MemoryRepository,
+): ContextSnapshot {
+  const emotions = emotionEngine.getCurrentEmotions();
+  let moodLabel = "neutral";
+  try {
+    moodLabel = emotionEngine.deriveMood();
+  } catch {
+    moodLabel = "neutral";
+  }
+  const moodState = moodEngine.getMood();
+  const interests = interestEngine.getTopInterests();
+  const arconInterests = interestEngine.getTopArconInterests();
+
+  const activeGoals = repository
+    .listMemories({ type: MemoryType.GOAL, status: MemoryStatus.ACTIVE })
+    .slice(0, 5);
+
+  const unresolvedConflicts = repository
+    .listMemories({ status: MemoryStatus.PENDING_CONFIRMATION })
+    .slice(0, 5);
+
+  const estimatedTokens =
+    selection.memories.reduce((sum, m) => sum + m.content.length, 0) / 4 +
+    selection.maxConversationTurns * 40;
+
+  return {
+    understanding: selection.understanding,
+    task: message,
+    intent: selection.understanding.intent,
+    subject: selection.understanding.subject,
+    relevantMemories: selection.memories,
+    relevantEntities: [],
+    currentEmotionalState: {
+      moodLabel,
+      emotions: {
+        happiness: emotions.happiness,
+        frustration: emotions.frustration,
+        curiosity: emotions.curiosity,
+        trust: emotions.trust,
+        confidence: emotions.confidence,
+      },
+    },
+    relevantInterests: [
+      ...interests.slice(0, 5).map((i) => ({ topic: i.topic, weight: i.weight })),
+      ...arconInterests.slice(0, 5).map((i) => ({ topic: i.topic, weight: i.weight })),
+    ],
+    activeGoals,
+    unresolvedConflicts,
+    confidence: selection.understanding.confidence,
+    selectedTopics: selection.selectedTopics,
+    excludedTopics: selection.excludedTopics,
+    contextBudget: {
+      maxMemories: selection.maxMemories,
+      maxConversationTurns: selection.maxConversationTurns,
+      maxPastConversations: selection.maxPastConversations,
+      estimatedTokens: Math.round(estimatedTokens),
+    },
+  };
 }

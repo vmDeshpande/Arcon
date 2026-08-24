@@ -1,4 +1,5 @@
 import {
+  MemoryScope,
   MemorySourceType,
   type MemoryType,
 } from "../personal-memory.js";
@@ -25,5 +26,6 @@ export function toMemoryCandidate(
       MemorySourceType.INFERRED,
     reasoning:
       "Semantic extraction",
+    scope: MemoryScope.USER,
   };
 }

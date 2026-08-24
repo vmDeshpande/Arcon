@@ -39,6 +39,7 @@ data/memories/*.sqlite-wal
 # Test artifacts
 .tmp-tests/
 packages/memory/.tmp-tests/
+packages/personality/.tmp-tests/
 .tmp-*/
 
 # Training artifacts (large generated files)
@@ -77,3 +78,12 @@ Thumbs.db
 *.tmp
 *.temp
 .tmp-*
+
+# Local runtime data
+apps/server/data/
+apps/chat/data/
+data/
+
+# Test databases
+tests/*.sqlite
+packages/*/tests/*.sqlite

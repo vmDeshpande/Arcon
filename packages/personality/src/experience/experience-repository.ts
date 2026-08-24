@@ -11,6 +11,7 @@ interface ExperienceRow {
   count: number;
   first_seen: string;
   last_seen: string;
+  context?: string;
 }
 
 export class ExperienceRepository {
@@ -31,15 +32,22 @@ export class ExperienceRepository {
         type TEXT UNIQUE NOT NULL,
         count INTEGER NOT NULL,
         first_seen TEXT NOT NULL,
-        last_seen TEXT NOT NULL
+        last_seen TEXT NOT NULL,
+        context TEXT
       );
 
       CREATE INDEX IF NOT EXISTS idx_experiences_type
       ON experiences(type);
     `);
+
+    try {
+      this.db.exec(`ALTER TABLE experiences ADD COLUMN context TEXT`);
+    } catch {
+      // Column already exists
+    }
   }
 
-  createExperience(type: string): Experience {
+  createExperience(type: string, context?: string): Experience {
     const now = new Date().toISOString();
 
     const experience: Experience = {
@@ -48,6 +56,7 @@ export class ExperienceRepository {
       count: 1,
       firstSeen: now,
       lastSeen: now,
+      context,
     };
 
     this.db
@@ -58,14 +67,16 @@ export class ExperienceRepository {
           type,
           count,
           first_seen,
-          last_seen
+          last_seen,
+          context
         )
         VALUES (
           @id,
           @type,
           @count,
           @firstSeen,
-          @lastSeen
+          @lastSeen,
+          @context
         )
       `,
       )
@@ -82,17 +93,18 @@ export class ExperienceRepository {
     return row ? toExperience(row) : null;
   }
 
-  incrementExperience(type: string): Experience {
+  incrementExperience(type: string, context?: string): Experience {
     const existing = this.getExperience(type);
 
     if (!existing) {
-      return this.createExperience(type);
+      return this.createExperience(type, context);
     }
 
     const updated: Experience = {
       ...existing,
       count: existing.count + 1,
       lastSeen: new Date().toISOString(),
+      context: context ?? existing.context,
     };
 
     this.db
@@ -100,11 +112,12 @@ export class ExperienceRepository {
         `
         UPDATE experiences
         SET count = ?,
-            last_seen = ?
+            last_seen = ?,
+            context = ?
         WHERE type = ?
       `,
       )
-      .run(updated.count, updated.lastSeen, type);
+      .run(updated.count, updated.lastSeen, updated.context, type);
 
     return updated;
   }
@@ -135,5 +148,6 @@ function toExperience(row: ExperienceRow): Experience {
     count: row.count,
     firstSeen: row.first_seen,
     lastSeen: row.last_seen,
+    context: row.context,
   };
 }

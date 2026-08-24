@@ -11,40 +11,54 @@ Arcon is a local-first persistent AI companion built on Qwen3-4B + Arcon V1 LoRA
                 Web UI / CLI
                       │
                       ▼
-             Node.js Arcon Runtime
+           Node.js Arcon Runtime
+           (apps/server + packages/*)
                       │
                       ▼
-            Cognitive Processing Layer
-            ┌─────────────────────────┐
-            │ Question Understanding   │
-            │ Context Selection        │
-            │ Relevance Ranking        │
-            │ Conflict Resolution      │
-            └─────────────────────────┘
+           ChatService Orchestration
                       │
                       ▼
-             PromptBuilder
+           Intent / Context Understanding
                       │
                       ▼
-           ArconLoRAProvider
+           Memory Retrieval
+           (status + scope + relevance filtering)
                       │
                       ▼
-        Python Inference Service
+           ContextSnapshot
+           (structured internal state)
                       │
                       ▼
-        Qwen/Qwen3-4B + Arcon V1 LoRA
+           Cognitive Core
+           (intent, strategy, uncertainty, clarification)
+                      │
+                      ▼
+           CognitiveDecision
+           (structured cognitive output)
+                      │
+                      ▼
+           PromptBuilder
+                      │
+                      ▼
+           Python Inference Service
+           (Qwen/Qwen3-4B + Arcon V1 LoRA)
                       │
                       ▼
            Generated Response
                       │
-          ┌────────────┴────────────┐
-          ▼                         ▼
-   User Response          State Updates
-                               ▼
-                  Memory / Emotion /
-                  Interests / Experiences
-                               ▼
-                          Persistence
+           ┌──────────┴──────────┐
+           ▼                     ▼
+    User Response       Experience Recording
+                                ▼
+                       Reflection / Consolidation
+                       (background, auditable)
+                                ▼
+                       MemoryPipeline
+                       (CREATE / UPDATE / SUPERSEDE / ARCHIVE)
+                                ▼
+                       Validated Memory
+                                ▼
+                       future retrieval
 ```
 
 ## Packages
@@ -52,8 +66,8 @@ Arcon is a local-first persistent AI companion built on Qwen3-4B + Arcon V1 LoRA
 | Package | Responsibility |
 |---------|---------------|
 | `@arcon/server` | Express server, HTTP endpoints, chat orchestration |
-| `@arcon/ai` | ChatService, cognitive layer, prompt building, inference provider |
-| `@arcon/memory` | SQLite repositories, memory pipeline, entity graph, retrieval |
+| `@arcon/ai` | ChatService, cognitive core, prompt building, inference provider |
+| `@arcon/memory` | SQLite repositories, memory pipeline, retrieval, reflection |
 | `@arcon/personality` | Identity, emotions, mood, interests, experiences |
 | `@arcon/cognition` | Reasoning engine, intent plugins, strategy plugins |
 | `@arcon/shared` | Types, interfaces, event bus |
@@ -66,15 +80,33 @@ The cognitive layer sits between user input and model generation. It:
 
 1. Understands the user's question (intent classification)
 2. Determines which context sources are relevant
-3. Retrieves and ranks candidate context
-4. Selects only relevant information
-5. Prepares the final prompt for the model
+3. Retrieves and ranks candidate context (status + scope + relevance filtering)
+4. Produces a structured `CognitiveDecision`
+5. Selects only relevant information
+6. Prepares the final prompt for the model
 
 The model remains responsible for natural-language understanding, reasoning, and response generation. The runtime never returns raw context as a conversational answer.
 
 ## Memory System
 
 Short-term conversation history is stored in `ConversationStore` (SQLite). Long-term durable knowledge is stored in `MemoryRepository` (SQLite) and retrieved via `MemoryRetriever`. Memories are extracted semantically by the LLM, validated, normalised, and passed through a review pipeline before storage.
+
+### Memory Lifecycle
+
+Memories have explicit lifecycle states:
+
+- **ACTIVE** — current, valid memory
+- **ARCHIVED** — intentionally hidden but preserved
+- **OBSOLETE** — outdated information
+- **CONTRADICTED** — conflicting information exists
+- **PENDING_CONFIRMATION** — awaiting validation
+- **SUPERSEDED** — replaced by newer memory (lineage preserved via `supersedesId`)
+
+The memory pipeline enforces these states during retrieval. Stale and invalid memories are excluded from normal retrieval.
+
+## Reflection
+
+Reflection examines accumulated experiences and proposes changes to the existing memory system. Proposals are auditable and always route through `MemoryPipeline`. Reflection never directly bypasses memory lifecycle rules.
 
 ## Persistence
 

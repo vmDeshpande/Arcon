@@ -44,12 +44,22 @@ export function calculateMemoryScore(
     statusBonus = 2;
   }
 
+  const excludedStatuses = new Set([
+    MemoryStatus.OBSOLETE,
+    MemoryStatus.CONTRADICTED,
+    MemoryStatus.PENDING_CONFIRMATION,
+    MemoryStatus.SUPERSEDED,
+  ]);
+
+  const statusPenalty = excludedStatuses.has(memory.status) ? -50 : 0;
+
   return (
     relevanceScore +
     importanceScore +
     confidenceScore +
     evidenceScore +
     recencyScore +
-    statusBonus
+    statusBonus +
+    statusPenalty
   );
 }
