@@ -680,6 +680,7 @@ Persistent Digital Companion
 Project documentation can be found in the `docs/` directory.
 
 * [Architecture](docs/architecture.md)
+* [Architecture audit 2026-08-24](docs/ARCON_ARCHITECTURE_AUDIT_2026-08-24.md)
 * [Design decisions](docs/decisions.md)
 * [Memory engine](docs/memory-engine.md)
 * [Roadmap](docs/roadmap.md)
@@ -687,7 +688,20 @@ Project documentation can be found in the `docs/` directory.
 * [Training specification](docs/arcon-training-specification.md)
 * [Dataset design](docs/arcon-dataset-design.md)
 * [Evaluation specification](docs/arcon-evaluation-specification.md)
-* [Architecture audit 2026-08-24](docs/ARCON_ARCHITECTURE_AUDIT_2026-08-24.md)
+
+Community and contribution documentation:
+
+* [Contributing](CONTRIBUTING.md)
+* [Code of Conduct](CODE_OF_CONDUCT.md)
+* [Security policy](SECURITY.md)
+* [Support](SUPPORT.md)
+* [Changelog](CHANGELOG.md)
+
+---
+
+# License
+
+Arcon is licensed under the [Apache License, Version 2.0](LICENSE).
 
 ---
 
@@ -695,14 +709,9 @@ Project documentation can be found in the `docs/` directory.
 
 Contributions are welcome.
 
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or submitting a pull request.
+
 Whether you're interested in AI, backend architecture, memory systems, reasoning engines or cognitive modelling, feel free to open an issue or submit a pull request.
-
-Before contributing, please:
-
-* Search existing issues.
-* Discuss major architectural changes before implementation.
-* Keep modules focused and loosely coupled.
-* Prefer small, reviewable pull requests.
 
 ---
 

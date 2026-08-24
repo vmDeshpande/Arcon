@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+issue_templates:
+  - name: Bug Report
+    about: Report a bug in Arcon
+    labels: bug
+  - name: Feature Request
+    about: Suggest a new feature for Arcon
+    labels: enhancement
+  - name: Architecture Discussion
+    about: Discuss architectural changes to Arcon
+    labels: architecture
