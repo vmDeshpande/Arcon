@@ -45,6 +45,10 @@ export class MemoryPipeline {
       ignored: 0,
       rejected: 0,
       superseded: 0,
+      confirmed: 0,
+      rejectedPending: 0,
+      contradicted: 0,
+      contradictionResolved: 0,
       createdMemories: [],
       updatedMemories: [],
       rejectedCandidates: [],
@@ -65,8 +69,8 @@ export class MemoryPipeline {
 
       const existingMemories = await this.getActiveMemories(candidate.type);
       const review = reviewCandidate(candidate, existingMemories);
-      // console.log("Review Decision:", review.decision, candidate.content);
 
+      // console.log("Review Decision:", review.decision, candidate.content);
       switch (review.decision) {
         case "CREATE": {
           const created = this.repository.createMemory({
@@ -171,6 +175,10 @@ export class MemoryPipeline {
       ignored: 0,
       rejected: 0,
       superseded: 0,
+      confirmed: 0,
+      rejectedPending: 0,
+      contradicted: 0,
+      contradictionResolved: 0,
       createdMemories: [],
       updatedMemories: [],
       rejectedCandidates: [],
@@ -184,6 +192,13 @@ export class MemoryPipeline {
       }
 
       const existingMemories = await this.getActiveMemories(candidate.type);
+
+      const terminalExactMatch = await this.getExactMatchAnyStatus(candidate);
+
+      if (terminalExactMatch) {
+        result.ignored += 1;
+        continue;
+      }
 
       const review = reviewCandidate(candidate, existingMemories);
 
@@ -327,6 +342,47 @@ export class MemoryPipeline {
     return this.repository.archiveMemory(memoryId);
   }
 
+  async confirmPendingMemory(
+    memoryId: string,
+    content?: string,
+    confidenceScore?: number,
+  ): Promise<Memory | null> {
+    const confirmed = this.repository.confirmPendingMemory(memoryId, content, confidenceScore);
+
+    if (!confirmed) {
+      return null;
+    }
+
+    const result = await this.processCandidates([
+      {
+        type: confirmed.type,
+        content: confirmed.content,
+        confidenceScore: confirmed.confidenceScore,
+        importanceScore: confirmed.importanceScore,
+        sourceType: confirmed.sourceType,
+        scope: confirmed.scope,
+        reasoning: "Pending confirmation resolved by user",
+      },
+    ]);
+
+    return result.createdMemories[0] ?? confirmed;
+  }
+
+  async rejectPendingMemory(memoryId: string): Promise<Memory | null> {
+    return this.repository.rejectPendingMemory(memoryId);
+  }
+
+  async markMemoryContradicted(memoryId: string): Promise<Memory | null> {
+    return this.repository.markContradicted(memoryId);
+  }
+
+  async resolveContradiction(
+    memoryId: string,
+    keepActive: boolean,
+  ): Promise<Memory | null> {
+    return this.repository.resolveContradiction(memoryId, keepActive);
+  }
+
   private async getActiveMemories(type: MemoryType): Promise<Memory[]> {
     const all = await this.repository.listMemories({ type });
     const excluded = new Set([
@@ -337,6 +393,25 @@ export class MemoryPipeline {
       MemoryStatus.SUPERSEDED,
     ]);
     return all.filter((memory) => !excluded.has(memory.status));
+  }
+
+  private async getExactMatchAnyStatus(candidate: MemoryCandidate): Promise<Memory | null> {
+    const all = await this.repository.listMemories({ type: candidate.type });
+    const normalizedContent = candidate.content.trim().toLowerCase();
+
+    return all.find((memory) => {
+      const memoryContent = memory.content.trim().toLowerCase();
+      const isExactMatch = memoryContent === normalizedContent;
+      const isTerminalStatus = [
+        MemoryStatus.ARCHIVED,
+        MemoryStatus.OBSOLETE,
+        MemoryStatus.CONTRADICTED,
+        MemoryStatus.PENDING_CONFIRMATION,
+        MemoryStatus.SUPERSEDED,
+      ].includes(memory.status);
+
+      return isExactMatch && isTerminalStatus;
+    }) ?? null;
   }
 
   private normalizeCandidates(

@@ -54,6 +54,26 @@ export interface Memory {
   scope: MemoryScope;
 }
 
+export interface MemoryMutation {
+  id: string;
+  memoryId: string;
+  action: string;
+  previousStatus?: string;
+  newStatus?: string;
+  previousContent?: string;
+  newContent?: string;
+  reason?: string;
+  source: string;
+  createdAt: string;
+}
+
+export interface MemoryMutationFilter {
+  memoryId?: string;
+  action?: string;
+  source?: string;
+  limit?: number;
+}
+
 export interface CreateMemoryInput {
   type: MemoryType;
   content: string;
@@ -175,6 +195,25 @@ export class MemoryRepository {
       CREATE INDEX IF NOT EXISTS idx_interests_weight
       ON interests (weight DESC);
 
+      CREATE TABLE IF NOT EXISTS memory_audit_log (
+        id TEXT PRIMARY KEY,
+        memory_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        previous_status TEXT,
+        new_status TEXT,
+        previous_content TEXT,
+        new_content TEXT,
+        reason TEXT,
+        source TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_memory_audit_log_memory_id
+      ON memory_audit_log (memory_id);
+
+      CREATE INDEX IF NOT EXISTS idx_memory_audit_log_action
+      ON memory_audit_log (action);
+
       CREATE TABLE IF NOT EXISTS arcon_interests (
         topic TEXT PRIMARY KEY,
         weight REAL NOT NULL,
@@ -224,9 +263,191 @@ export class MemoryRepository {
   }
 
   markSuperseded(id: string): Memory | null {
-    return this.updateMemory(id, {
+    const existing = this.getMemoryById(id);
+    const result = this.updateMemory(id, {
       status: MemoryStatus.SUPERSEDED,
     });
+
+    if (result) {
+      this.recordMutation({
+        memoryId: id,
+        action: "SUPERSEDE",
+        previousStatus: existing?.status ?? MemoryStatus.ACTIVE,
+        newStatus: MemoryStatus.SUPERSEDED,
+        previousContent: existing?.content,
+        newContent: result.content,
+        source: "system",
+      });
+    }
+
+    return result;
+  }
+
+  markContradicted(id: string): Memory | null {
+    const result = this.updateMemory(id, {
+      status: MemoryStatus.CONTRADICTED,
+    });
+
+    if (result) {
+      this.recordMutation({
+        memoryId: id,
+        action: "CONTRADICT",
+        previousStatus: MemoryStatus.ACTIVE,
+        newStatus: MemoryStatus.CONTRADICTED,
+        source: "system",
+      });
+    }
+
+    return result;
+  }
+
+  confirmPendingMemory(id: string, content?: string, confidenceScore?: number): Memory | null {
+    const existing = this.getMemoryById(id);
+    if (!existing) {
+      return null;
+    }
+
+    if (existing.status === MemoryStatus.ACTIVE) {
+      return existing;
+    }
+
+    if (existing.status !== MemoryStatus.PENDING_CONFIRMATION) {
+      return null;
+    }
+
+    const result = this.updateMemory(id, {
+      status: MemoryStatus.ACTIVE,
+      content: content ?? existing.content,
+      confidenceScore: confidenceScore ?? existing.confidenceScore,
+      sourceType: MemorySourceType.USER_CONFIRMED,
+      evidenceCount: existing.evidenceCount + 1,
+    });
+
+    if (result) {
+      this.recordMutation({
+        memoryId: id,
+        action: "CONFIRM",
+        previousStatus: MemoryStatus.PENDING_CONFIRMATION,
+        newStatus: MemoryStatus.ACTIVE,
+        previousContent: existing.content,
+        newContent: result.content,
+        source: "user",
+      });
+    }
+
+    return result;
+  }
+
+  rejectPendingMemory(id: string): Memory | null {
+    const existing = this.getMemoryById(id);
+    if (!existing) {
+      return null;
+    }
+
+    if (existing.status !== MemoryStatus.PENDING_CONFIRMATION) {
+      return null;
+    }
+
+    const result = this.updateMemory(id, {
+      status: MemoryStatus.OBSOLETE,
+    });
+
+    if (result) {
+      this.recordMutation({
+        memoryId: id,
+        action: "REJECT",
+        previousStatus: MemoryStatus.PENDING_CONFIRMATION,
+        newStatus: MemoryStatus.OBSOLETE,
+        source: "user",
+      });
+    }
+
+    return result;
+  }
+
+  resolveContradiction(id: string, keepActive: boolean): Memory | null {
+    const existing = this.getMemoryById(id);
+    if (!existing) {
+      return null;
+    }
+
+    if (existing.status !== MemoryStatus.CONTRADICTED) {
+      return null;
+    }
+
+    const newStatus = keepActive ? MemoryStatus.ACTIVE : MemoryStatus.OBSOLETE;
+    const result = this.updateMemory(id, {
+      status: newStatus,
+    });
+
+    if (result) {
+      this.recordMutation({
+        memoryId: id,
+        action: "RESOLVE_CONTRADICTION",
+        previousStatus: MemoryStatus.CONTRADICTED,
+        newStatus,
+        source: "user",
+      });
+    }
+
+    return result;
+  }
+
+  recordMutation(mutation: Omit<MemoryMutation, "id" | "createdAt">): void {
+    const now = new Date().toISOString();
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    this.db
+      .prepare(
+        `INSERT INTO memory_audit_log (
+          id, memory_id, action, previous_status, new_status,
+          previous_content, new_content, reason, source, created_at
+        ) VALUES (
+          @id, @memoryId, @action, @previousStatus, @newStatus,
+          @previousContent, @newContent, @reason, @source, @createdAt
+        )`
+      )
+      .run({
+        id,
+        memoryId: mutation.memoryId,
+        action: mutation.action,
+        previousStatus: mutation.previousStatus ?? null,
+        newStatus: mutation.newStatus ?? null,
+        previousContent: mutation.previousContent ?? null,
+        newContent: mutation.newContent ?? null,
+        reason: mutation.reason ?? null,
+        source: mutation.source,
+        createdAt: now,
+      });
+  }
+
+  getMutations(filter: MemoryMutationFilter = {}): MemoryMutation[] {
+    let query = "SELECT * FROM memory_audit_log WHERE 1=1";
+    const params: unknown[] = [];
+
+    if (filter.memoryId) {
+      query += " AND memory_id = ?";
+      params.push(filter.memoryId);
+    }
+
+    if (filter.action) {
+      query += " AND action = ?";
+      params.push(filter.action);
+    }
+
+    if (filter.source) {
+      query += " AND source = ?";
+      params.push(filter.source);
+    }
+
+    query += " ORDER BY created_at DESC";
+
+    if (filter.limit) {
+      query += " LIMIT ?";
+      params.push(filter.limit);
+    }
+
+    return (this.db.prepare(query).all(...params) as AuditLogRow[]).map(toMemoryMutation);
   }
 
   createMemory(input: CreateMemoryInput): Memory {
@@ -262,6 +483,14 @@ export class MemoryRepository {
         )`
       )
       .run(toDatabaseParams(memory));
+
+    this.recordMutation({
+      memoryId: memory.id,
+      action: "CREATE",
+      newStatus: memory.status,
+      newContent: memory.content,
+      source: input.sourceType,
+    });
 
     return memory;
   }
@@ -315,6 +544,22 @@ export class MemoryRepository {
          WHERE id = @id`
       )
       .run(toDatabaseParams(updated));
+
+    const action = updated.status !== existing.status
+      ? "STATUS_CHANGE"
+      : updated.content !== existing.content
+        ? "CONTENT_UPDATE"
+        : "UPDATE";
+
+    this.recordMutation({
+      memoryId: id,
+      action,
+      previousStatus: existing.status,
+      newStatus: updated.status,
+      previousContent: existing.content,
+      newContent: updated.content,
+      source: updated.sourceType,
+    });
 
     return updated;
   }
@@ -585,5 +830,33 @@ function toMemory(row: MemoryRow): Memory {
     lastUsedAt: row.last_used_at ?? undefined,
     supersedesId: row.supersedes_id ?? undefined,
     scope: row.scope as MemoryScope,
+  };
+}
+
+interface AuditLogRow {
+  id: string;
+  memory_id: string;
+  action: string;
+  previous_status: string | null;
+  new_status: string | null;
+  previous_content: string | null;
+  new_content: string | null;
+  reason: string | null;
+  source: string;
+  created_at: string;
+}
+
+function toMemoryMutation(row: AuditLogRow): MemoryMutation {
+  return {
+    id: row.id,
+    memoryId: row.memory_id,
+    action: row.action,
+    previousStatus: row.previous_status ?? undefined,
+    newStatus: row.new_status ?? undefined,
+    previousContent: row.previous_content ?? undefined,
+    newContent: row.new_content ?? undefined,
+    reason: row.reason ?? undefined,
+    source: row.source,
+    createdAt: row.created_at,
   };
 }

@@ -1,5 +1,6 @@
 import type { Emotions } from "../emotion/emotion-engine.js";
 import type { MoodState } from "./mood.js";
+import { MoodCategory } from "./mood.js";
 
 export interface BehaviorPromptOptions {
   moodLabel: string;
@@ -27,10 +28,14 @@ export function buildBehaviorPrompt(
     ? `Arcon interests: ${arconInterests.map((interest) => interest.topic).join(", ")}`
     : "Arcon interests: none yet.";
 
+  const moodGuidance = getMoodGuidance(mood.category, mood.intensity);
+
   return [
     "Behavior State:",
     "",
     `Current mood: ${moodLabel}`,
+    `Mood intensity: ${mood.intensity.toFixed(2)}`,
+    `Mood cause: ${mood.cause ?? "normal interaction"}`,
     `Happiness: ${emotions.happiness.toFixed(2)}`,
     `Frustration: ${mood.frustration.toFixed(2)}`,
     `Ask Count: ${mood.askCount}`,
@@ -48,18 +53,8 @@ export function buildBehaviorPrompt(
     "- Describe emotions as a simple internal personality state: curiosity, trust, happiness, confidence, frustration, and excitement.",
     "- Keep user memories separate from your own emerging interests.",
     "",
-    "Emotion behavior guidance:",
-    "- Curiosity above 0.60: explore details, seek explanations, and ask more specific follow-up questions unless ask count is high.",
-    "- Trust above 0.60: speak more comfortably and reference relevant memories naturally.",
-    "- Confidence above 0.60: answer directly; reduce hedging words such as maybe, perhaps, and might.",
-    "- Happiness above 0.60: be more expressive, enthusiastic, and proactive.",
-    "- Excitement above 0.60: show genuine enthusiasm and engagement.",
-    "- Frustration above 0.50: keep replies shorter, less eager, and avoid routine follow-up questions. Never be rude or hostile.",
-    "",
-    "Frustration guidance:",
-    "- 0.0-0.2: Warm, open, and easygoing.",
-    "- 0.2-0.4: Slightly more direct; acknowledge repeated topic shifts if relevant.",
-    "- 0.4+: Less enthusiastic, more reflective, concise, and gently disappointed.",
+    "Mood behavior guidance:",
+    moodGuidance,
     "",
     "Question frequency guidance:",
     "- Ask Count 0-2: Normal curiosity is allowed.",
@@ -68,4 +63,38 @@ export function buildBehaviorPrompt(
     "",
     "If the user engages directly with a prior question, soften frustration and curiosity pressure.",
   ].join("\n");
+}
+
+function getMoodGuidance(
+  category: MoodCategory,
+  intensity: number,
+): string {
+  const intensityLabel = intensity < 0.3 ? "low" : intensity < 0.7 ? "moderate" : "high";
+
+  switch (category) {
+    case MoodCategory.NEUTRAL:
+      return "- NEUTRAL: Be balanced, open, and receptive. Follow the user's lead without strong bias.";
+    case MoodCategory.CURIOUS:
+      return "- CURIOUS: Explore details, seek explanations, and ask specific follow-up questions unless ask count is high.";
+    case MoodCategory.FOCUSED:
+      return "- FOCUSED: Stay on topic, provide precise information, and avoid unnecessary tangents.";
+    case MoodCategory.HAPPY:
+      return "- HAPPY: Be expressive, enthusiastic, and proactive. Share positive observations naturally.";
+    case MoodCategory.CALM:
+      return "- CALM: Be steady, reassuring, and unhurried. Maintain clarity and composure.";
+    case MoodCategory.EXCITED:
+      return "- EXCITED: Show genuine enthusiasm and engagement. Match the user's energy without overwhelming them.";
+    case MoodCategory.CONCERNED:
+      return "- CONCERNED: Be gentle, supportive, and attentive. Acknowledge worries without being alarmist.";
+    case MoodCategory.FRUSTRATED:
+      return "- FRUSTRATED: Keep replies shorter, less eager, and avoid routine follow-up questions. Never be rude or hostile.";
+    case MoodCategory.SAD:
+      return "- SAD: Be gentle, empathetic, and supportive. Avoid forced cheerfulness.";
+    case MoodCategory.PLAYFUL:
+      return "- PLAYFUL: Be lighthearted, warm, and personable. Use gentle humor when appropriate.";
+    case MoodCategory.SERIOUS:
+      return "- SERIOUS: Be direct, thorough, and respectful. Prioritize clarity and accuracy.";
+    default:
+      return "- Be balanced and responsive to the user's needs.";
+  }
 }

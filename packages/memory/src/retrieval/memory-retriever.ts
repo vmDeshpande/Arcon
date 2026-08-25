@@ -40,13 +40,8 @@ export class MemoryRetriever {
     limit = 10
   ): Memory[] {
     const entityMemories = this.retrieveEntityMemories(query, limit);
-
-    if (entityMemories.length > 0) {
-      this.markUsed(entityMemories);
-      return entityMemories;
-    }
-
-    const memories = this.repository
+    const resolvedEntity = this.resolveTargetEntity(query);
+    const generalMemories = this.repository
       .listMemories()
       .filter(
         (memory) => !EXCLUDED_FROM_NORMAL_RETRIEVAL.has(memory.status)
@@ -57,7 +52,16 @@ export class MemoryRetriever {
           memory.scope === MemoryScope.ARCON
       );
 
-    const scored = memories
+    const filteredGeneralMemories = resolvedEntity
+      ? this.excludeOtherEntityMemories(generalMemories, resolvedEntity.name)
+      : generalMemories;
+
+    const combined = this.dedupeMemories([
+      ...entityMemories,
+      ...filteredGeneralMemories,
+    ]);
+
+    const scored = combined
       .map((memory) => ({
         memory,
         score: calculateMemoryScore(memory, query)
@@ -82,20 +86,24 @@ export class MemoryRetriever {
     } = options;
 
     const entityMemories = this.retrieveEntityMemories(query, limit);
-
-    if (entityMemories.length > 0) {
-      this.markUsed(entityMemories);
-      return entityMemories;
-    }
-
+    const resolvedEntity = this.resolveTargetEntity(query);
     const statusFilter = EXCLUDED_FROM_NORMAL_RETRIEVAL;
-    const memories = this.repository
+    const generalMemories = this.repository
       .listMemories({ type, scope })
       .filter(
         (memory) => !statusFilter.has(memory.status)
       );
 
-    const scored = memories
+    const filteredGeneralMemories = resolvedEntity
+      ? this.excludeOtherEntityMemories(generalMemories, resolvedEntity.name)
+      : generalMemories;
+
+    const combined = this.dedupeMemories([
+      ...entityMemories,
+      ...filteredGeneralMemories,
+    ]);
+
+    const scored = combined
       .map((memory) => ({
         memory,
         score: calculateMemoryScore(memory, query)
@@ -164,10 +172,7 @@ export class MemoryRetriever {
       ...graphMemories,
       ...storedMemories,
       ...entityScoped,
-    ]).slice(
-      0,
-      limit,
-    );
+    ]);
   }
 
   private resolveTargetEntity(query: string): Entity | null {
@@ -254,6 +259,27 @@ export class MemoryRetriever {
     }
 
     return unique;
+  }
+
+  private excludeOtherEntityMemories(memories: Memory[], entityName: string): Memory[] {
+    if (!this.entityRepository) {
+      return memories;
+    }
+
+    const lowerEntityName = entityName.toLowerCase();
+    const otherEntityNames = this.entityRepository
+      .listEntities()
+      .filter((entity) => entity.name.toLowerCase() !== lowerEntityName)
+      .map((entity) => entity.name.toLowerCase());
+
+    if (otherEntityNames.length === 0) {
+      return memories;
+    }
+
+    return memories.filter((memory) => {
+      const lowerContent = memory.content.toLowerCase();
+      return !otherEntityNames.some((name) => lowerContent.includes(name));
+    });
   }
 
   private syntheticMemory(

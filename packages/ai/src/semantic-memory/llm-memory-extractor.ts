@@ -32,11 +32,6 @@ export class LlmMemoryExtractor {
     const response = await this.aiClient.generateReply(messages);
     const cleanedResponse = stripThinkTokens(response);
 
-    // console.log("RAW EXTRACTION:");
-    // console.log(response);
-    // console.log("CLEANED EXTRACTION:");
-    // console.log(cleanedResponse);
-
     return this.repairExtraction(
       message,
       parseExtraction(cleanedResponse),

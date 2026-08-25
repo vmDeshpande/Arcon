@@ -705,6 +705,64 @@ The following items are documented in existing specifications but were **not imp
 
 ---
 
+## Conversation-Readiness Validation — 2026-08-25
+
+A real runtime smoke test was conducted against the actual Qwen/Qwen3-4B + arcon-v1 LoRA inference service on RTX 3050 6GB. This section distinguishes between automated test results and observed runtime behavior.
+
+### Automated Validation
+
+- **288 tests** passing across 32 test files
+- **0 failures**
+- **0 skipped**
+- All 8 workspaces build successfully
+
+### Real Runtime Smoke Test Results
+
+The following scenarios were tested against the live runtime:
+
+| Scenario | Result | Observed Behavior |
+|----------|--------|-------------------|
+| Memory creation + retrieval | PASS | "I use Arch Linux." created ACTIVE memory. "What operating system do I use?" correctly answered "You're using Arch Linux." |
+| Correction / supersession | FAIL | "I switched to Fedora." did NOT supersede the Arch Linux memory. Arch Linux remained ACTIVE. LLM answered "Fedora" from conversational context, not from memory retrieval. |
+| Memory rejection | FAIL | "I really like pineapple pizza." was stored as ACTIVE PREFERENCE immediately. No confirmation prompt was shown. |
+| Project isolation | FAIL | "For Project A, I use PostgreSQL." created a PROJECT memory. "For Project B, I use SQLite." did NOT create a second PROJECT memory. |
+| Mood tracking | PASS | Mood changed to HAPPY with intensity=1 and cause="user shared positive news" after excited user input. |
+| Mood decay | FAIL | Intensity remained at 1.0 after two neutral messages ("Ok.", "I see."). No decay occurred. |
+| Full conversation | FAIL | Server timed out after 300s on "My name is Vedant and I prefer TypeScript." |
+
+### Known Runtime Blockers
+
+1. **Supersession/correction unreliable with real LLM extraction**: The real LLM extraction output does not consistently trigger the supersession pipeline. Old memories remain ACTIVE even when users explicitly correct them.
+2. **No runtime confirmation/rejection flow**: Preferences are stored immediately without user confirmation. The `PENDING_CONFIRMATION` mechanism exists in the pipeline but is not wired into the runtime.
+3. **Inconsistent real LLM extraction**: Extraction behavior varies between similar messages. Some expected memories are silently not extracted.
+4. **Mood decay not functioning**: Intensity does not decrease over neutral messages at runtime.
+5. **Full conversation timeout**: Complex messages can exceed the 300s timeout on RTX 3050 + Qwen3-4B.
+
+### Critical Distinction: Automated Tests vs Real Runtime
+
+The automated test suite uses controlled mocks for LLM extraction. The mocks return deterministic extraction results that exercise the memory pipeline correctly. However, the real LLM (Qwen3-4B + arcon-v1 LoRA) produces extraction output that:
+
+- Does not consistently match supersession patterns
+- Sometimes returns empty arrays for messages that should contain memories
+- Sometimes returns extractions that the pipeline does not handle as expected
+
+**This means the automated tests verify the architecture works correctly under ideal conditions, but the real runtime LLM integration is not yet robust enough for production conversation.**
+
+### Architecture Integrity
+
+Despite the runtime blockers, the architectural foundations remain sound:
+
+- Memory lifecycle states are correctly defined and enforced at the pipeline level
+- Supersession logic works correctly when extraction output matches expected patterns
+- Project scope isolation works correctly at the retrieval level
+- Mood state machine, categories, intensity, and cause tracking are correctly implemented
+- Conversation memory and long-term memory remain properly separated
+- All Phase A–E capabilities are intact and tested
+
+The blockers are integration/robustness issues, not architectural deficiencies.
+
+---
+
 ## STATE AT END OF DEVELOPMENT DAY
 
 Arcon is a local-first AI companion with the following verified capabilities:

@@ -1,5 +1,6 @@
 import {
   MoodState,
+  MoodCategory,
   createDefaultMood,
 } from "./mood.js";
 
@@ -28,14 +29,18 @@ export class MoodEngine {
   getMood(): MoodState {
     const emotions = this.emotionEngine.getCurrentEmotions();
     const stored = this.repository.getMood();
+    const category = this.classifyMood(emotions, stored);
 
     return {
+      category,
+      intensity: stored.intensity,
       curiosity: emotions.curiosity,
       frustration: emotions.frustration,
       askCount: stored.askCount,
       pendingQuestion: stored.pendingQuestion,
       trust: emotions.trust,
       excitement: emotions.excitement,
+      cause: stored.cause,
       updatedAt: new Date().toISOString(),
     };
   }
@@ -129,8 +134,14 @@ export class MoodEngine {
       );
     }
 
-    mood.updatedAt =
-      new Date().toISOString();
+    const emotions = this.emotionEngine.getCurrentEmotions();
+    const newCategory = this.classifyMood(emotions, mood);
+    const cause = this.inferCause(message, newCategory);
+
+    mood.category = newCategory;
+    mood.intensity = this.calculateIntensity(emotions);
+    mood.cause = cause;
+    mood.updatedAt = new Date().toISOString();
 
     this.repository.saveMood(mood);
 
@@ -152,6 +163,103 @@ export class MoodEngine {
   reset(): void {
     this.emotionEngine.reset();
     this.repository.reset();
+  }
+
+  private classifyMood(
+    emotions: Emotions,
+    mood: MoodState,
+  ): MoodCategory {
+    if (emotions.frustration > 0.6) {
+      return MoodCategory.FRUSTRATED;
+    }
+
+    if (emotions.happiness > 0.6 && emotions.trust > 0.5) {
+      return MoodCategory.HAPPY;
+    }
+
+    if (emotions.curiosity > 0.6) {
+      return MoodCategory.CURIOUS;
+    }
+
+    if (emotions.confidence > 0.6) {
+      return MoodCategory.SERIOUS;
+    }
+
+    if (emotions.trust < 0.3 && emotions.frustration > 0.3) {
+      return MoodCategory.CONCERNED;
+    }
+
+    if (emotions.happiness > 0.4) {
+      return MoodCategory.PLAYFUL;
+    }
+
+    if (emotions.excitement > 0.6) {
+      return MoodCategory.EXCITED;
+    }
+
+    return MoodCategory.NEUTRAL;
+  }
+
+  private calculateIntensity(
+    emotions: Emotions,
+  ): number {
+    const values = Object.values(emotions);
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const range = max - min;
+
+    return Math.min(1, Math.max(0, range * 2));
+  }
+
+  private inferCause(
+    message: string,
+    category: MoodCategory,
+  ): string {
+    const normalized = message.toLowerCase();
+
+    if (category === MoodCategory.FRUSTRATED) {
+      if (/\b(angry|furious|upset|annoyed|irritated)\b/.test(normalized)) {
+        return "user expressed frustration";
+      }
+      return "interaction difficulty";
+    }
+
+    if (category === MoodCategory.HAPPY) {
+      if (/\b(great|awesome|amazing|wonderful|fantastic|excellent)\b/.test(normalized)) {
+        return "user shared positive news";
+      }
+      return "positive engagement";
+    }
+
+    if (category === MoodCategory.CURIOUS) {
+      if (/\?/.test(normalized)) {
+        return "user asked a question";
+      }
+      return "exploratory conversation";
+    }
+
+    if (category === MoodCategory.EXCITED) {
+      if (/\b(excited|amazing|awesome|incredible|wow)\b/.test(normalized)) {
+        return "user expressed excitement";
+      }
+      return "high-engagement topic";
+    }
+
+    if (category === MoodCategory.CONCERNED) {
+      if (/\b(worried|concerned|problem|issue|trouble|help)\b/.test(normalized)) {
+        return "user raised a concern";
+      }
+      return "low trust environment";
+    }
+
+    if (category === MoodCategory.PLAYFUL) {
+      if (/\b(haha|lol|funny|joke|play|game)\b/.test(normalized)) {
+        return "user was playful";
+      }
+      return "lighthearted interaction";
+    }
+
+    return "normal interaction";
   }
 
   private isPositiveEngagement(

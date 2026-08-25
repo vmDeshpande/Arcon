@@ -19,15 +19,15 @@ const memory = createConversationMemory(config.memoryDatabasePath);
 
 let aiClient: import("@arcon/shared").AiClient;
 
-if (config.inferenceBackend === "arcon-lora") {
-  const options: ArconLoRAProviderOptions = {
-    baseUrl: config.arconInferenceBaseUrl,
-    model: config.arconAdapterName,
-    timeoutMs: 120_000,
-  };
+  if (config.inferenceBackend === "arcon-lora") {
+    const options: ArconLoRAProviderOptions = {
+      baseUrl: config.arconInferenceBaseUrl,
+      model: config.arconAdapterName,
+      timeoutMs: 300_000,
+    };
 
-  aiClient = createArconLoRAProvider(options);
-} else {
+    aiClient = createArconLoRAProvider(options);
+  } else {
   const options: OllamaClientOptions = {
     baseUrl: config.ollamaBaseUrl,
     model: config.ollamaModel,

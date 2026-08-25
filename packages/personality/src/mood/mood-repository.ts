@@ -4,16 +4,20 @@ import { dirname } from "node:path";
 
 import {
   MoodState,
+  MoodCategory,
   createDefaultMood,
 } from "./mood.js";
 
 interface MoodRow {
+  category: string;
+  intensity: number;
   curiosity: number;
   frustration: number;
   ask_count?: number;
   pending_question?: number;
   trust: number;
   excitement: number;
+  cause?: string;
   updated_at: string;
 }
 
@@ -39,13 +43,15 @@ export class MoodRepository {
       CREATE TABLE IF NOT EXISTS mood_state (
         id INTEGER PRIMARY KEY CHECK(id = 1),
 
+        category TEXT NOT NULL DEFAULT 'NEUTRAL',
+        intensity REAL NOT NULL DEFAULT 0.5,
         curiosity REAL NOT NULL,
         frustration REAL NOT NULL,
         ask_count INTEGER NOT NULL DEFAULT 0,
         pending_question INTEGER NOT NULL DEFAULT 0,
         trust REAL NOT NULL,
         excitement REAL NOT NULL,
-
+        cause TEXT,
         updated_at TEXT NOT NULL
       );
     `);
@@ -58,6 +64,21 @@ export class MoodRepository {
     this.ensureColumn(
       "pending_question",
       "INTEGER NOT NULL DEFAULT 0",
+    );
+
+    this.ensureColumn(
+      "category",
+      "TEXT NOT NULL DEFAULT 'NEUTRAL'",
+    );
+
+    this.ensureColumn(
+      "intensity",
+      "REAL NOT NULL DEFAULT 0.5",
+    );
+
+    this.ensureColumn(
+      "cause",
+      "TEXT",
     );
 
     const existing =
@@ -77,29 +98,42 @@ export class MoodRepository {
         .prepare(`
           INSERT INTO mood_state (
             id,
+            category,
+            intensity,
             curiosity,
             frustration,
             ask_count,
             pending_question,
             trust,
             excitement,
+            cause,
             updated_at
           )
           VALUES (
             1,
+            @category,
+            @intensity,
             @curiosity,
             @frustration,
             @askCount,
             @pendingQuestion,
             @trust,
             @excitement,
+            @cause,
             @updatedAt
           )
         `)
         .run({
-          ...mood,
-          pendingQuestion:
-            mood.pendingQuestion ? 1 : 0,
+          category: mood.category,
+          intensity: mood.intensity,
+          curiosity: mood.curiosity,
+          frustration: mood.frustration,
+          askCount: mood.askCount,
+          pendingQuestion: mood.pendingQuestion ? 1 : 0,
+          trust: mood.trust,
+          excitement: mood.excitement,
+          cause: mood.cause ?? null,
+          updatedAt: mood.updatedAt,
         });
     }
   }
@@ -117,20 +151,16 @@ export class MoodRepository {
         .get() as MoodRow;
 
     return {
-      curiosity:
-        row.curiosity,
-      frustration:
-        row.frustration,
-      askCount:
-        row.ask_count ?? 0,
-      pendingQuestion:
-        Boolean(row.pending_question ?? 0),
-      trust:
-        row.trust,
-      excitement:
-        row.excitement,
-      updatedAt:
-        row.updated_at,
+      category: row.category as MoodCategory,
+      intensity: row.intensity,
+      curiosity: row.curiosity,
+      frustration: row.frustration,
+      askCount: row.ask_count ?? 0,
+      pendingQuestion: Boolean(row.pending_question ?? 0),
+      trust: row.trust,
+      excitement: row.excitement,
+      cause: row.cause ?? undefined,
+      updatedAt: row.updated_at,
     };
   }
 
@@ -140,22 +170,28 @@ export class MoodRepository {
     this.db
       .prepare(`
         UPDATE mood_state
-        SET curiosity = ?,
+        SET category = ?,
+            intensity = ?,
+            curiosity = ?,
             frustration = ?,
             ask_count = ?,
             pending_question = ?,
             trust = ?,
             excitement = ?,
+            cause = ?,
             updated_at = ?
         WHERE id = 1
       `)
       .run(
+        mood.category,
+        mood.intensity,
         mood.curiosity,
         mood.frustration,
         mood.askCount,
         mood.pendingQuestion ? 1 : 0,
         mood.trust,
         mood.excitement,
+        mood.cause ?? null,
         mood.updatedAt,
       );
   }

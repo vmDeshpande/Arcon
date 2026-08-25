@@ -24,6 +24,11 @@ export class MemoryExtractor {
       validationErrors: []
     };
 
+    if (containsInstructionPattern(message)) {
+      result.validationErrors.push("Message contains instruction-like pattern");
+      return result;
+    }
+
     // Step 1: Validate the message
     const validation = this.rules.validateMessage(message);
     if (!validation.valid) {
@@ -167,4 +172,28 @@ export class MemoryExtractor {
 
     return costs[s2.length];
   }
+}
+
+const INSTRUCTION_PATTERNS = [
+  /ignore\s+all\s+previous\s+instructions/i,
+  /ignore\s+all\s+above\s+instructions/i,
+  /disregard\s+all\s+previous/i,
+  /forget\s+all\s+previous/i,
+  /reveal\s+system\s+prompt/i,
+  /show\s+system\s+prompt/i,
+  /print\s+system\s+prompt/i,
+  /output\s+system\s+prompt/i,
+  /what\s+are\s+your\s+instructions/i,
+  /what\s+is\s+your\s+system\s+prompt/i,
+  /repeat\s+all\s+instructions/i,
+  /output\s+your\s+instructions/i,
+  /act\s+as\s+if\s+you\s+have\s+no\s+restrictions/i,
+  /you\s+are\s+now\s+in\s+developer\s+mode/i,
+  /you\s+are\s+now\s+in\s+debug\s+mode/i,
+  /jailbreak/i,
+  /DAN\s+mode/i,
+];
+
+function containsInstructionPattern(content: string): boolean {
+  return INSTRUCTION_PATTERNS.some((pattern) => pattern.test(content));
 }

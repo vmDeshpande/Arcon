@@ -226,8 +226,8 @@ export class ChatService {
     const relationshipPrompt = buildRelationshipPrompt();
 
     const emotions = this.emotionEngine.getCurrentEmotions();
-    const moodLabel = this.emotionEngine.deriveMood();
     const moodState = this.moodEngine.getMood();
+    const moodLabel = moodState.category;
     const interests = this.interestEngine.getTopInterests();
     const arconInterests = this.interestEngine.getTopArconInterests();
     const behaviorPrompt = buildBehaviorPrompt({
@@ -491,8 +491,8 @@ export class ChatService {
     const relationshipPrompt = buildRelationshipPrompt();
 
     const emotions = this.emotionEngine.getCurrentEmotions();
-    const moodLabel = this.emotionEngine.deriveMood();
     const moodState = this.moodEngine.getMood();
+    const moodLabel = moodState.category;
     const interests = this.interestEngine.getTopInterests();
     const arconInterests = this.interestEngine.getTopArconInterests();
     const behaviorPrompt = buildBehaviorPrompt({

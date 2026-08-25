@@ -43,6 +43,20 @@
 - Weak evidence rejection (configurable threshold)
 - Supersession lineage preserved
 
+## Conversation-Readiness Validation — BLOCKED
+
+Automated validation is complete and passing (291/291 tests, 8/8 workspaces build).
+
+Real runtime validation against Qwen/Qwen3-4B + arcon-v1 LoRA on RTX 3050 found the following blockers:
+
+1. **Supersession/correction not reliable**: Real LLM extraction does not consistently produce content that triggers the supersession pipeline. Old memories remain ACTIVE even when the user explicitly corrects them.
+2. **No runtime confirmation/rejection flow**: Preferences are stored immediately without user confirmation. The `PENDING_CONFIRMATION` mechanism exists but is not wired into the runtime.
+3. **Inconsistent real LLM extraction**: Extraction behavior varies between similar messages. Some expected memories are silently not extracted.
+4. **Mood decay not functioning**: Intensity does not decrease over neutral messages at runtime.
+5. **Full conversation timeout**: Complex messages can exceed the 300s timeout on RTX 3050 + Qwen3-4B.
+
+**Status**: The conversation-ready milestone is **NOT YET COMPLETE**. The above issues must be resolved before declaring conversation readiness.
+
 ## Future Phases
 
 The following are planned but not yet implemented:

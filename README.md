@@ -222,6 +222,25 @@ Current capabilities include:
 * Supersession with lineage preservation
 * Selective retrieval with relevance threshold
 * Context building via `ContextSnapshot`
+* Pending confirmation resolution (confirm/reject/supersede/archive)
+* Contradiction state with resolution path
+* Memory mutation audit log
+* Prompt-injection safety boundary in extraction
+* Rejected-value protection (superseded values cannot be recreated)
+
+### Validation Status
+
+**Automated tests**: 288/288 passing across 32 test files. All 8 workspaces build successfully.
+
+**Real runtime validation**: Blocked. Smoke testing against Qwen/Qwen3-4B + arcon-v1 LoRA on RTX 3050 revealed the following blockers:
+
+1. Supersession/correction does not reliably trigger with real LLM extraction output.
+2. No runtime memory confirmation/rejection flow before storing preferences.
+3. Real LLM extraction is inconsistent for similar message patterns.
+4. Mood decay does not reduce intensity as expected at runtime.
+5. Full conversation runtime can exceed 300s timeout on RTX 3050 + Qwen3-4B.
+
+The conversation-ready milestone is **not yet complete**. See `CHANGELOG.md` for detailed findings.
 
 ---
 

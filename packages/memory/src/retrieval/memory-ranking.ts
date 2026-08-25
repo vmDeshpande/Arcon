@@ -19,10 +19,10 @@ export function calculateMemoryScore(
     }
   }
 
-  const relevanceScore = keywordMatches * 5;
-  const importanceScore = memory.importanceScore * 2;
-  const confidenceScore = memory.confidenceScore * 10;
-  const evidenceScore = Math.min(memory.evidenceCount, 10);
+  const relevanceScore = keywordMatches * 10;
+  const importanceScore = memory.importanceScore;
+  const confidenceScore = memory.confidenceScore * 5;
+  const evidenceScore = Math.min(memory.evidenceCount, 5);
 
   let recencyScore = 1;
 
@@ -53,6 +53,8 @@ export function calculateMemoryScore(
 
   const statusPenalty = excludedStatuses.has(memory.status) ? -50 : 0;
 
+  const irrelevancePenalty = keywordMatches === 0 ? -1000 : 0;
+
   return (
     relevanceScore +
     importanceScore +
@@ -60,6 +62,7 @@ export function calculateMemoryScore(
     evidenceScore +
     recencyScore +
     statusBonus +
-    statusPenalty
+    statusPenalty +
+    irrelevancePenalty
   );
 }
