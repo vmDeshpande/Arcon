@@ -1,4 +1,5 @@
 import type { AiClient, ChatMessage } from "@arcon/shared";
+import type { RuntimeIdentity } from "../runtime-identity.js";
 
 export interface ArconLoRAProviderOptions {
   baseUrl: string;
@@ -174,8 +175,47 @@ export class ArconLoRAProvider implements AiClient {
     this.modelInfo = (await response.json()) as LoRAModelInfoResponse;
     return this.modelInfo;
   }
+
+  async getRuntimeIdentity(): Promise<RuntimeIdentity> {
+    try {
+      const info = await this.getModelInfo();
+
+      return {
+        baseModel: info.base_model,
+        adapterName: info.adapter_name,
+        adapterVersion: info.adapter_version,
+        adapterPath: info.adapter_path,
+        inferenceBackend: "arcon-lora",
+        adapterActive: info.adapter_name !== "none" && info.adapter_path !== "none",
+        loadedAt: info.loaded_at,
+        gpuMemoryAllocatedMB: info.gpu_memory.allocated_MB,
+        gpuMemoryReservedMB: info.gpu_memory.reserved_MB,
+      };
+    } catch {
+      return {
+        baseModel: "Qwen/Qwen3-4B",
+        adapterName: this.model,
+        adapterVersion: "unknown",
+        adapterPath: "unknown",
+        inferenceBackend: "arcon-lora",
+        adapterActive: false,
+        loadedAt: "",
+        gpuMemoryAllocatedMB: 0,
+        gpuMemoryReservedMB: 0,
+      };
+    }
+  }
+
+  async isAdapterActive(): Promise<boolean> {
+    try {
+      const identity = await this.getRuntimeIdentity();
+      return identity.adapterActive;
+    } catch {
+      return false;
+    }
+  }
 }
 
-export function createArconLoRAProvider(options: ArconLoRAProviderOptions): AiClient {
+export function createArconLoRAProvider(options: ArconLoRAProviderOptions): ArconLoRAProvider {
   return new ArconLoRAProvider(options);
 }

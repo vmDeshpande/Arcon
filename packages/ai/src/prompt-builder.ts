@@ -1,5 +1,7 @@
 import type { ContextSelection, ContextSnapshot } from "./cognitive/context-selection.js";
 import type { CognitiveDecision } from "./cognitive-adapter.js";
+import type { RuntimeCapabilities } from "./runtime-capabilities.js";
+import type { RuntimeIdentity } from "./runtime-identity.js";
 
 export interface PromptBuildInput {
   systemPrompt: string;
@@ -13,6 +15,8 @@ export interface PromptBuildInput {
     reason: string;
     tone: string;
   };
+  capabilities?: RuntimeCapabilities;
+  runtimeIdentity?: RuntimeIdentity;
 }
 
 export class PromptBuilder {
@@ -22,6 +26,23 @@ export class PromptBuilder {
       input.systemPrompt,
       "",
     ];
+
+    if (input.runtimeIdentity) {
+      sections.push("RUNTIME IDENTITY:");
+      sections.push(`Base model: ${input.runtimeIdentity.baseModel}`);
+      sections.push(`Adapter: ${input.runtimeIdentity.adapterName} (${input.runtimeIdentity.adapterVersion})`);
+      sections.push(`Adapter active: ${input.runtimeIdentity.adapterActive ? "yes" : "no"}`);
+      sections.push(`Inference backend: ${input.runtimeIdentity.inferenceBackend}`);
+      sections.push("");
+    }
+
+    if (input.capabilities) {
+      sections.push("RUNTIME CAPABILITIES:");
+      for (const capability of input.capabilities.capabilities) {
+        sections.push(`- ${capability.name}: ${capability.status}${capability.notes ? ` (${capability.notes})` : ""}`);
+      }
+      sections.push("");
+    }
 
     if (input.strategy) {
       sections.push(

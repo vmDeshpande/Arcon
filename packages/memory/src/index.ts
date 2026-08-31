@@ -10,6 +10,7 @@ export * from "./retrieval/memory-ranking.js";
 export * from "./pipeline/memory-pipeline.js";
 export * from "./pipeline/memory-review.js";
 export * from "./pipeline/memory-result.js";
+export * from "./pipeline/memory-domain.js";
 
 export * from "./reflection/reflection-candidate.js";
 export * from "./reflection/reflection-engine.js";

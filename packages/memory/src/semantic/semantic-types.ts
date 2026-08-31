@@ -3,6 +3,7 @@ export interface SemanticMemory {
   content: string;
   confidenceScore: number;
   importanceScore: number;
+  domain?: string;
 }
 
 export interface ValidationResult {

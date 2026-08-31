@@ -18,6 +18,9 @@ from typing import Optional
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse

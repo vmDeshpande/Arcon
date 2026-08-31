@@ -125,6 +125,7 @@ export class CognitiveAdapter {
     const hasRelevantMemories = input.snapshot.relevantMemories.length > 0;
     const isGreeting = result.intent?.goal === "greeting";
 
+
     const requiresClarification =
       (result.intent?.requiresClarification ?? false) ||
       (!isGreeting && input.snapshot.understanding.confidence < 0.7 && !hasRelevantMemories) ||

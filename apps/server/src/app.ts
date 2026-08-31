@@ -10,7 +10,7 @@ import {
   type ChatResponse,
   type ConversationMemory
 } from "@arcon/shared";
-import { ChatService, type ChatServiceOptions } from "@arcon/ai";
+import { ChatService, type ChatServiceOptions, type RuntimeIdentity } from "@arcon/ai";
 import { MemoryRepository, MemoryPipeline } from "@arcon/memory";
 
 export interface CreateAppOptions {
@@ -22,6 +22,7 @@ export interface CreateAppOptions {
   ollamaModel?: string;
   arconInferenceBaseUrl?: string;
   arconAdapterName?: string;
+  runtimeIdentity: RuntimeIdentity;
   chatServiceOptions?: ChatServiceOptions;
   memoryDatabasePath?: string;
 }
@@ -54,6 +55,7 @@ export function createApp(options: CreateAppOptions) {
         response.json({
           inferenceBackend: options.inferenceBackend,
           model: info,
+          runtimeIdentity: options.runtimeIdentity,
         });
       } else {
         response.json({
@@ -65,6 +67,7 @@ export function createApp(options: CreateAppOptions) {
             adapter_version: "unknown",
             inference_backend: "Ollama",
           },
+          runtimeIdentity: options.runtimeIdentity,
         });
       }
     } catch (error) {

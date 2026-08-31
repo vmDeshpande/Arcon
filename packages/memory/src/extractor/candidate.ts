@@ -25,6 +25,9 @@ export interface MemoryCandidate {
 
   /** Memory scope (USER, ARCON, PROJECT, ENTITY, CONVERSATION) */
   scope?: MemoryScope;
+
+  /** Semantic domain/key for cross-type supersession and conflict detection (e.g., "os", "programming_language", "favorite_color") */
+  domain?: string;
 }
 
 /**

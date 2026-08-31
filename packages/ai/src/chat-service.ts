@@ -12,7 +12,7 @@ import {
   ConversationEntityTracker,
   ConversationStore,
 } from "@arcon/memory";
-import type { MemoryCandidate } from "@arcon/memory";
+import type { MemoryCandidate, Memory, PipelineResult, SemanticMemory } from "@arcon/memory";
 import type { AiClient, ChatMessage } from "@arcon/shared";
 import {
   buildIdentityPrompt,
@@ -38,6 +38,7 @@ import { stripThinkTokens } from "./utils/strip-think-tokens.js";
 export interface ChatResult {
   prompt: string;
   reply: string;
+  pendingConfirmations: Memory[];
 }
 
 export interface ChatServiceOptions {
@@ -140,6 +141,43 @@ export class ChatService {
       role: "assistant",
       content: reply,
     });
+  }
+
+  private async processMemoryExtraction(
+    memoryPromise: Promise<MemoryCandidate[]>,
+    resolvedMessage: string,
+  ): Promise<PipelineResult> {
+    const semanticMemories = await memoryPromise;
+    const validator = new SemanticValidator();
+    const normalizer = new SemanticNormalizer();
+
+    const normalizedMemories: SemanticMemory[] = [];
+
+    for (const memory of semanticMemories) {
+      const validation = validator.validate(memory);
+
+      if (!validation.valid) {
+        continue;
+      }
+
+      const normalized = normalizer.normalize(memory);
+      normalizedMemories.push(normalized);
+    }
+
+    const resolvedMemories = normalizedMemories;
+    this.conversationTracker.update(resolvedMemories);
+    this.entityLinker.link(resolvedMemories);
+    this.knowledgeBuilder.build(resolvedMemories);
+
+    const semanticCandidates = resolvedMemories.map((memory) =>
+      toMemoryCandidate(memory),
+    );
+
+    if (semanticCandidates.length > 0) {
+      return this.pipeline.processCandidates(semanticCandidates, resolvedMessage);
+    }
+
+    return this.pipeline.processMessage(resolvedMessage);
   }
 
   async chat(message: string): Promise<ChatResult> {
@@ -322,9 +360,16 @@ export class ChatService {
         arconInterests,
       );
 
+      this.processMemoryExtraction(memoryPromise, resolvedMessage).catch(
+        () => {
+          /* Memory processing failure must not crash the conversation */
+        },
+      );
+
       return {
         prompt: clarificationPrompt,
         reply,
+        pendingConfirmations: [],
       };
     }
 
@@ -369,41 +414,15 @@ export class ChatService {
       arconInterests,
     );
 
-    const semanticMemories = await memoryPromise;
-    const validator = new SemanticValidator();
-    const normalizer = new SemanticNormalizer();
-
-    const normalizedMemories = [];
-
-    for (const memory of semanticMemories) {
-      const validation = validator.validate(memory);
-
-      if (!validation.valid) {
-        continue;
-      }
-
-      const normalized = normalizer.normalize(memory);
-      normalizedMemories.push(normalized);
-    }
-
-    const resolvedMemories = normalizedMemories;
-    this.conversationTracker.update(resolvedMemories);
-    this.entityLinker.link(resolvedMemories);
-    this.knowledgeBuilder.build(resolvedMemories);
-
-    const semanticCandidates = resolvedMemories.map((memory) =>
-      toMemoryCandidate(memory),
+    const pipelineResult = await this.processMemoryExtraction(
+      memoryPromise,
+      resolvedMessage,
     );
-
-    if (semanticCandidates.length > 0) {
-      await this.pipeline.processCandidates(semanticCandidates);
-    } else {
-      await this.pipeline.processMessage(resolvedMessage);
-    }
 
     return {
       prompt,
       reply,
+      pendingConfirmations: pipelineResult.pendingConfirmations,
     };
   }
 
@@ -677,7 +696,7 @@ export class ChatService {
       );
 
       if (semanticCandidates.length > 0) {
-        await this.pipeline.processCandidates(semanticCandidates);
+        await this.pipeline.processCandidates(semanticCandidates, resolvedMessage);
       } else {
         await this.pipeline.processMessage(resolvedMessage);
       }

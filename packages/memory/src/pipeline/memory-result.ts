@@ -14,4 +14,5 @@ export interface PipelineResult {
   createdMemories: Memory[];
   updatedMemories: Memory[];
   rejectedCandidates: MemoryCandidate[];
+  pendingConfirmations: Memory[];
 }

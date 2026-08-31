@@ -33,12 +33,12 @@ export class ExtractionRules {
 
     // Pattern: "My favorite X is Y"
     const favoriteMatch = message.match(
-      /my\s+favorite\s+(\w+)\s+(?:is|are)\s+(.+?)(?:\.|$)/i,
+      /my\s+favorite\s+(.+?)\s+(?:is|are)\s+(.+?)(?:\.|$)/i,
     );
     if (favoriteMatch) {
       candidates.push({
         type: MemoryType.PREFERENCE,
-        content: `User's favorite ${favoriteMatch[1]} is ${favoriteMatch[2].trim()}`,
+        content: `User's favorite ${favoriteMatch[1].trim()} is ${favoriteMatch[2].trim()}`,
         confidenceScore: 0.95,
         importanceScore: 6,
         sourceType: MemorySourceType.USER_EXPLICIT,
@@ -56,6 +56,19 @@ export class ExtractionRules {
         importanceScore: 6,
         sourceType: MemorySourceType.USER_EXPLICIT,
         reasoning: "Explicit preference statement",
+      });
+    }
+
+    // Pattern: "I switched from X to Y" / "I changed from X to Y"
+    const switchedPreferenceMatch = message.match(/i\s+(?:switched|changed)\s+from\s+.+\s+to\s+(.+?)(?:\.|$)/i);
+    if (switchedPreferenceMatch) {
+      candidates.push({
+        type: MemoryType.PREFERENCE,
+        content: `User prefers ${switchedPreferenceMatch[1].trim()}`,
+        confidenceScore: 0.9,
+        importanceScore: 6,
+        sourceType: MemorySourceType.USER_EXPLICIT,
+        reasoning: "User explicitly switched preference",
       });
     }
 
@@ -133,16 +146,57 @@ export class ExtractionRules {
       });
     }
 
-    // Pattern: "I use X"
-    const useMatch = message.match(/i\s+use\s+(.+?)(?:\.|$)/i);
-    if (useMatch) {
+    // Pattern: "I switched to X" / "I upgraded to X" / "I changed to X"
+    const switchedMatch = message.match(/i\s+(?:switched|upgraded|changed)\s+to\s+(.+?)(?:\.|$)/i);
+    if (switchedMatch) {
       candidates.push({
         type: MemoryType.FACT,
-        content: `User uses ${useMatch[1].trim()}`,
+        content: `User uses ${switchedMatch[1].trim()}`,
+        confidenceScore: 0.9,
+        importanceScore: 5,
+        sourceType: MemorySourceType.USER_EXPLICIT,
+        reasoning: "User explicitly states they switched/upgraded to something",
+      });
+    }
+
+    // Pattern: "I now use X" / "I currently use X"
+    const nowUseMatch = message.match(/i\s+(?:now|currently)\s+use\s+(.+?)(?:\.|$)/i);
+    if (nowUseMatch) {
+      candidates.push({
+        type: MemoryType.FACT,
+        content: `User uses ${nowUseMatch[1].trim()}`,
+        confidenceScore: 0.9,
+        importanceScore: 5,
+        sourceType: MemorySourceType.USER_EXPLICIT,
+        reasoning: "User explicitly states they now/currently use something",
+      });
+    }
+
+    // Pattern: "I use X" / "I use X now" / "I use X currently"
+    const useMatch = message.match(/i\s+use\s+(.+?)(?:\.|$)/i);
+    if (useMatch) {
+      let content = useMatch[1].trim();
+      content = content.replace(/\s+(now|currently)$/i, "").trim();
+      candidates.push({
+        type: MemoryType.FACT,
+        content: `User uses ${content}`,
         confidenceScore: 0.9,
         importanceScore: 5,
         sourceType: MemorySourceType.USER_EXPLICIT,
         reasoning: "User explicitly states they use something",
+      });
+    }
+
+    // Pattern: "I use X now" / "I use X currently"
+    const useNowMatch = message.match(/i\s+use\s+(.+?)\s+(?:now|currently)(?:\.|$)/i);
+    if (useNowMatch) {
+      candidates.push({
+        type: MemoryType.FACT,
+        content: `User uses ${useNowMatch[1].trim()}`,
+        confidenceScore: 0.9,
+        importanceScore: 5,
+        sourceType: MemorySourceType.USER_EXPLICIT,
+        reasoning: "User explicitly states they use something now/currently",
       });
     }
 

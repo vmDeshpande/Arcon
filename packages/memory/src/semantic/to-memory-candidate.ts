@@ -27,5 +27,6 @@ export function toMemoryCandidate(
     reasoning:
       "Semantic extraction",
     scope: MemoryScope.USER,
+    domain: memory.domain,
   };
 }

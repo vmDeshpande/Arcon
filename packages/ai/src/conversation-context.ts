@@ -8,6 +8,12 @@ export interface ConversationTurn {
   createdAt: string;
 }
 
+export interface ConversationMessageSource {
+  role: "user" | "assistant" | "system";
+  content: string;
+  createdAt: string;
+}
+
 export class ConversationContext {
   private readonly histories: Map<string, ConversationTurn[]> = new Map();
   private readonly limit: number;
@@ -62,5 +68,18 @@ export class ConversationContext {
       const role = turn.role === "user" ? "User" : "Arcon";
       return `${role}: ${turn.content}`;
     });
+  }
+
+  loadFromMessages(conversationId: string, messages: ConversationMessageSource[]): void {
+    const history: ConversationTurn[] = messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+        createdAt: m.createdAt,
+      }))
+      .slice(-this.limit);
+
+    this.histories.set(conversationId, history);
   }
 }

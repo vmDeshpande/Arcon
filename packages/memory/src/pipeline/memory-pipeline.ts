@@ -39,6 +39,7 @@ export class MemoryPipeline {
   }
 
   async processMessage(message: string): Promise<PipelineResult> {
+
     const result: PipelineResult = {
       created: 0,
       updated: 0,
@@ -52,9 +53,11 @@ export class MemoryPipeline {
       createdMemories: [],
       updatedMemories: [],
       rejectedCandidates: [],
+      pendingConfirmations: [],
     };
 
     let extraction = this.extractor.extract(message);
+
     if (extraction.validationErrors.length > 0) {
       result.rejected = extraction.validationErrors.length;
       return result;
@@ -68,7 +71,7 @@ export class MemoryPipeline {
       }
 
       const existingMemories = await this.getActiveMemories(candidate.type);
-      const review = reviewCandidate(candidate, existingMemories);
+      const review = reviewCandidate(candidate, existingMemories, message);
 
       // console.log("Review Decision:", review.decision, candidate.content);
       switch (review.decision) {
@@ -129,6 +132,7 @@ export class MemoryPipeline {
           });
           result.created += 1;
           result.createdMemories.push(created);
+          result.pendingConfirmations.push(created);
           break;
         }
         case "SUPERSEDE": {
@@ -168,6 +172,7 @@ export class MemoryPipeline {
 
   async processCandidates(
     candidates: MemoryCandidate[],
+    originalMessage?: string,
   ): Promise<PipelineResult> {
     const result: PipelineResult = {
       created: 0,
@@ -182,6 +187,7 @@ export class MemoryPipeline {
       createdMemories: [],
       updatedMemories: [],
       rejectedCandidates: [],
+      pendingConfirmations: [],
     };
 
     for (const candidate of this.normalizeCandidates(candidates)) {
@@ -200,9 +206,7 @@ export class MemoryPipeline {
         continue;
       }
 
-      const review = reviewCandidate(candidate, existingMemories);
-
-      // console.log("Review Decision:", review.decision, candidate.content);
+      const review = reviewCandidate(candidate, existingMemories, originalMessage);
 
       switch (review.decision) {
         case "CREATE": {
@@ -261,6 +265,7 @@ export class MemoryPipeline {
 
           result.created += 1;
           result.createdMemories.push(created);
+          result.pendingConfirmations.push(created);
           break;
         }
 

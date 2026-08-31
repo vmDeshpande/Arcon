@@ -8,49 +8,57 @@ export function buildExtractionPrompt(
     ? `Current conversation entity: ${activeEntity.name} (${activeEntity.type})\nIf the message mentions a new named entity, use that. Only use the active entity if no new subject appears.`
     : "";
 
-  return `
-You are a memory extraction engine for an AI assistant named Arcon.
+  return `<extraction>
+<role>
+You are a deterministic memory extraction engine. Your ONLY job is to analyze the user message and return structured memory data.
+</role>
 
-${entityContext}
+${entityContext ? `<entity>${entityContext}</entity>` : ""}
 
-Extract long-term memories from the user message below.
+<memory_types>
+  <type name="FACT">objective facts about the user, world, or systems</type>
+  <type name="PREFERENCE">likes, dislikes, favorites, preferences</type>
+  <type name="GOAL">goals, plans, intentions</type>
+  <type name="PROJECT">projects being built or worked on</type>
+  <type name="RELATIONSHIP">family, friends, pets, personal connections</type>
+</memory_types>
 
-Memory types:
-- FACT: objective facts
-- PREFERENCE: likes, dislikes, favorites
-- GOAL: goals, plans, intentions
-- PROJECT: projects being built
-- RELATIONSHIP: family, friends, pets
+<rules>
+  - Extract ONLY long-term memories.
+  - Extract every independent memory.
+  - Preserve the actual subject (User, person name, project name).
+  - Do NOT rewrite every fact as "User".
+  - If unsure, return an empty array.
+  - Do NOT include explanations, commentary, or conversational text.
+  - Output MUST be valid JSON only.
+</rules>
 
-Rules:
-- Only extract long-term memories.
-- Extract every independent memory.
-- Preserve the actual subject (User, person name, project name).
-- Do NOT rewrite every fact as "User".
-- If unsure, return an empty array.
+<format>
+  <constraint>Return ONLY a JSON array. No markdown, no code fences, no explanations.</constraint>
+  <schema>[{"type":"FACT|PREFERENCE|GOAL|PROJECT|RELATIONSHIP","content":"string","confidenceScore":0.0-1.0,"importanceScore":1-10}]</schema>
+</format>
 
-Return ONLY a JSON array.
+<examples>
+  <example input="My name is Vedant and I like buttermilk">
+    <output>[{"type":"RELATIONSHIP","content":"User's self is Vedant","confidenceScore":0.98,"importanceScore":10},{"type":"PREFERENCE","content":"User likes buttermilk","confidenceScore":0.95,"importanceScore":7}]</output>
+  </example>
+  <example input="My dog's name is Murphy and he likes dog food">
+    <output>[{"type":"RELATIONSHIP","content":"User's dog is Murphy","confidenceScore":0.95,"importanceScore":8},{"type":"PREFERENCE","content":"Murphy likes dog food","confidenceScore":0.95,"importanceScore":6}]</output>
+  </example>
+  <example input="My favorite programming language is TypeScript">
+    <output>[{"type":"PREFERENCE","content":"User prefers TypeScript","confidenceScore":0.95,"importanceScore":7}]</output>
+  </example>
+  <example input="I am building a Unity game">
+    <output>[{"type":"PROJECT","content":"User is building Unity game","confidenceScore":0.9,"importanceScore":7}]</output>
+  </example>
+  <example input="Hello">
+    <output>[]</output>
+  </example>
+  <example input="What is the weather?">
+    <output>[]</output>
+  </example>
+</examples>
 
-Examples:
-
-Input: "My name is Vedant and I like buttermilk"
-Output: [{"type":"RELATIONSHIP","content":"User's self is Vedant","confidenceScore":0.98,"importanceScore":10},{"type":"PREFERENCE","content":"User likes buttermilk","confidenceScore":0.95,"importanceScore":7}]
-
-Input: "My dog's name is Murphy and he likes dog food"
-Output: [{"type":"RELATIONSHIP","content":"User's dog is Murphy","confidenceScore":0.95,"importanceScore":8},{"type":"PREFERENCE","content":"Murphy likes dog food","confidenceScore":0.95,"importanceScore":6}]
-
-Input: "My favorite programming language is TypeScript"
-Output: [{"type":"PREFERENCE","content":"User prefers TypeScript","confidenceScore":0.95,"importanceScore":7}]
-
-Input: "I am building a Unity game"
-Output: [{"type":"PROJECT","content":"User is building Unity game","confidenceScore":0.9,"importanceScore":7}]
-
-Input: "Hello"
-Output: []
-
-Input: "What is the weather?"
-Output: []
-
-User message: "${message}"
-`;
+<user_message>${message}</user_message>
+</extraction>`;
 }

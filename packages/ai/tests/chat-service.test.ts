@@ -7,6 +7,9 @@ import { join } from "node:path";
 import {
   MemoryPipeline,
   MemoryRepository,
+  MemoryType,
+  MemoryStatus,
+  MemorySourceType,
 } from "@arcon/memory";
 import { MoodRepository, buildBehaviorPrompt } from "@arcon/personality";
 import type {
@@ -377,5 +380,40 @@ describe("ChatService streaming", () => {
 
     service.close();
     repository.close();
+  });
+
+  it("returns pending confirmations when conflict is detected", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "arcon-confirm-"));
+    const repository = new MemoryRepository(join(dir, "memories.sqlite"));
+    const pipeline = new MemoryPipeline(repository);
+    const service = new ChatService(
+      repository,
+      pipeline,
+      new SequenceAiClient(["Sure"]),
+      {
+        experienceDatabasePath: join(dir, "experiences.sqlite"),
+        moodDatabasePath: join(dir, "mood.sqlite"),
+        entityDatabasePath: join(dir, "entities.sqlite"),
+      },
+    );
+
+    repository.createMemory({
+      type: MemoryType.PREFERENCE,
+      content: "User's favorite language is TypeScript",
+      importanceScore: 6,
+      confidenceScore: 0.9,
+      sourceType: MemorySourceType.USER_EXPLICIT,
+    });
+
+    const result = await service.chat("My favorite language is JavaScript");
+
+    assert.strictEqual(result.pendingConfirmations.length, 1);
+    assert.ok(result.pendingConfirmations[0].content.includes("JavaScript"));
+    assert.strictEqual(
+      result.pendingConfirmations[0].status,
+      MemoryStatus.PENDING_CONFIRMATION,
+    );
+
+    service.close();
   });
 });

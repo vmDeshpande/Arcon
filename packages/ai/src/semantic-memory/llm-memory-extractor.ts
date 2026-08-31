@@ -42,11 +42,19 @@ export class LlmMemoryExtractor {
     message: string,
     memories: MemoryCandidate[],
   ): MemoryCandidate[] {
+    if (isHypothetical(message) || isQuestionOnly(message) || isAssistantLike(message)) {
+      return [];
+    }
+
     const identityName = this.extractIdentityName(message);
     const project = this.extractProjectTarget(message);
 
     const repaired = memories.flatMap((memory) => {
       if (isRedundantEntityOnlyMemory(memory.content)) {
+        return [];
+      }
+
+      if (isHypotheticalMemory(memory.content) || isQuestionLikeMemory(memory.content)) {
         return [];
       }
 
@@ -71,7 +79,7 @@ export class LlmMemoryExtractor {
           ? {
               ...memory,
               content: memory.content.replace(identityName, "User"),
-          }
+            }
           : memory;
 
       if (this.isBlockedSelfRelationship(identityResolvedMemory)) {
@@ -240,4 +248,61 @@ export class LlmMemoryExtractor {
 
     return Boolean(match && isBlockedUserIdentityName(match[1]));
   }
+}
+
+const HYPOTHETICAL_PATTERNS = [
+  /^if\s+.*\s+then\s+/i,
+  /^if\s+i\s+were\s+to\b/i,
+  /^suppose\s+/i,
+  /^what\s+if\s+/i,
+  /^imagine\s+/i,
+  /^hypothetically/i,
+  /^let's\s+say\s+/i,
+  /^for\s+example/i,
+  /^e\.g\./i,
+  /\bwould\s+you\b/i,
+  /\bcould\s+you\b/i,
+  /\bshould\s+you\b/i,
+];
+
+const QUESTION_PATTERNS = [
+  /^what\s+is\s+the\s+weather/i,
+  /^how\s+are\s+you/i,
+  /^what\s+do\s+you\s+think/i,
+  /^what\s+is\s+your\s+name/i,
+  /^who\s+are\s+you/i,
+  /^what\s+can\s+you\s+do/i,
+];
+
+const ASSISTANT_PATTERNS = [
+  /^as\s+an\s+ai/i,
+  /^i\s+am\s+an?\s+ai\b/i,
+  /^i\s+don't\s+have\s+(?:feelings|emotions|personal)/i,
+  /^i\s+cannot\b/i,
+  /^i\s+can't\b/i,
+];
+
+function isHypothetical(message: string): boolean {
+  return HYPOTHETICAL_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+function isQuestionOnly(message: string): boolean {
+  const isQuestion = message.trim().endsWith("?");
+  if (!isQuestion) {
+    return false;
+  }
+
+  return QUESTION_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+function isAssistantLike(message: string): boolean {
+  return ASSISTANT_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+function isHypotheticalMemory(content: string): boolean {
+  return HYPOTHETICAL_PATTERNS.some((pattern) => pattern.test(content));
+}
+
+function isQuestionLikeMemory(content: string): boolean {
+  return QUESTION_PATTERNS.some((pattern) => pattern.test(content));
 }

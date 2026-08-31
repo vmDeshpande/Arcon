@@ -395,4 +395,88 @@ describe("MemoryPipeline", () => {
     assert.strictEqual(newMemory.supersedesId, oldMemory.id);
     assert.strictEqual(oldMemory.status, MemoryStatus.SUPERSEDED);
   });
+
+  it("supersedes active memory when original message contains replacement indicator", async () => {
+    repository.createMemory({
+      type: MemoryType.FACT,
+      content: "User uses Arch Linux",
+      importanceScore: 5,
+      confidenceScore: 0.9,
+      sourceType: MemorySourceType.USER_EXPLICIT,
+    });
+
+    const result = await pipeline.processCandidates(
+      [
+        {
+          type: MemoryType.FACT,
+          content: "User uses Fedora",
+          confidenceScore: 0.9,
+          importanceScore: 5,
+          sourceType: MemorySourceType.USER_EXPLICIT,
+          reasoning: "test",
+        },
+      ],
+      "I switched to Fedora",
+    );
+
+    assert.strictEqual(result.created, 1);
+    assert.strictEqual(result.superseded, 1);
+
+    const newMemory = result.createdMemories[0];
+    const oldMemory = result.updatedMemories[0];
+
+    assert.ok(newMemory.content.includes("Fedora"));
+    assert.strictEqual(oldMemory.status, MemoryStatus.SUPERSEDED);
+    assert.strictEqual(newMemory.supersedesId, oldMemory.id);
+  });
+
+  it("creates pending confirmation for conflicting preferences", async () => {
+    repository.createMemory({
+      type: MemoryType.PREFERENCE,
+      content: "User prefers JavaScript",
+      importanceScore: 6,
+      confidenceScore: 0.9,
+      sourceType: MemorySourceType.USER_EXPLICIT,
+    });
+
+    const result = await pipeline.processCandidates([
+      {
+        type: MemoryType.PREFERENCE,
+        content: "User prefers TypeScript",
+        confidenceScore: 0.95,
+        importanceScore: 8,
+        sourceType: MemorySourceType.USER_EXPLICIT,
+        reasoning: "test",
+      },
+    ]);
+
+    assert.strictEqual(result.created, 1);
+    assert.strictEqual(result.pendingConfirmations.length, 1);
+    assert.strictEqual(result.pendingConfirmations[0].content.includes("TypeScript"), true);
+    assert.strictEqual(result.pendingConfirmations[0].status, MemoryStatus.PENDING_CONFIRMATION);
+  });
+
+  it("returns pending confirmations from processCandidates", async () => {
+    repository.createMemory({
+      type: MemoryType.PREFERENCE,
+      content: "User prefers JavaScript",
+      importanceScore: 6,
+      confidenceScore: 0.9,
+      sourceType: MemorySourceType.USER_EXPLICIT,
+    });
+
+    const result = await pipeline.processCandidates([
+      {
+        type: MemoryType.PREFERENCE,
+        content: "User prefers TypeScript",
+        confidenceScore: 0.95,
+        importanceScore: 8,
+        sourceType: MemorySourceType.INFERRED,
+        reasoning: "test",
+      },
+    ]);
+
+    assert.strictEqual(result.pendingConfirmations.length, 1);
+    assert.strictEqual(result.pendingConfirmations[0].content.includes("TypeScript"), true);
+  });
 });

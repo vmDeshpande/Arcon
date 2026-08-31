@@ -206,3 +206,64 @@ test("recovers developing relationship for project statements", async () => {
     ],
   );
 });
+
+test("filters out hypothetical statements", async () => {
+  const extractor = new LlmMemoryExtractor(
+    new FakeAiClient(
+      JSON.stringify([
+        {
+          type: "FACT",
+          content: "User uses Linux",
+          confidenceScore: 0.9,
+          importanceScore: 5,
+        },
+      ]),
+    ),
+  );
+
+  const memories = await extractor.extract(
+    "If I were to use Linux, I would try Arch",
+  );
+
+  assert.strictEqual(memories.length, 0);
+});
+
+test("filters out standalone questions", async () => {
+  const extractor = new LlmMemoryExtractor(
+    new FakeAiClient(
+      JSON.stringify([
+        {
+          type: "FACT",
+          content: "User likes pizza",
+          confidenceScore: 0.9,
+          importanceScore: 5,
+        },
+      ]),
+    ),
+  );
+
+  const memories = await extractor.extract("What is your name?");
+
+  assert.strictEqual(memories.length, 0);
+});
+
+test("filters out assistant-like statements", async () => {
+  const extractor = new LlmMemoryExtractor(
+    new FakeAiClient(
+      JSON.stringify([
+        {
+          type: "FACT",
+          content: "Arcon is an AI",
+          confidenceScore: 0.9,
+          importanceScore: 5,
+        },
+      ]),
+    ),
+  );
+
+  const memories = await extractor.extract(
+    "As an AI, I don't have personal feelings",
+  );
+
+  assert.strictEqual(memories.length, 0);
+});
