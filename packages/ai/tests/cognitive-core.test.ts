@@ -328,7 +328,9 @@ describe("Phase D Cognitive Core", () => {
 
       const result = await service.chat("Hello");
       assert(result.prompt.includes("RUNTIME CAPABILITIES:"));
-      assert(result.prompt.includes("SQLite-backed persistent memory"));
+      assert(result.prompt.includes("persistent personal memory"));
+      assert(result.prompt.includes("IMPLEMENTED"));
+      assert(result.prompt.includes("RUNTIME IDENTITY:"));
 
       service.close();
     });

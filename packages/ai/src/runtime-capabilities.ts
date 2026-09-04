@@ -1,4 +1,4 @@
-export type CapabilityStatus = "IMPLEMENTED" | "PARTIAL" | "NOT_IMPLEMENTED";
+export type CapabilityStatus = "IMPLEMENTED" | "PARTIAL" | "NOT_IMPLEMENTED" | "UNAVAILABLE";
 
 export interface RuntimeCapability {
   name: string;

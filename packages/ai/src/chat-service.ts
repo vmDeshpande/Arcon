@@ -34,6 +34,11 @@ import { LlmMemoryExtractor } from "./semantic-memory/index.js";
 import { ConversationContext } from "./conversation-context.js";
 import { CognitiveAdapter, CognitiveInput, CognitiveDecision } from "./cognitive-adapter.js";
 import { stripThinkTokens } from "./utils/strip-think-tokens.js";
+import type { RuntimeState } from "./runtime-state.js";
+import type { RuntimeIdentity } from "./runtime-identity.js";
+import type { RuntimeCapabilities } from "./runtime-capabilities.js";
+import { buildRuntimeCapabilities } from "./runtime-state.js";
+import { CapabilityRecall, createCapabilityRecall } from "./capability-recall.js";
 
 export interface ChatResult {
   prompt: string;
@@ -46,6 +51,10 @@ export interface ChatServiceOptions {
   moodDatabasePath?: string;
   entityDatabasePath?: string;
   conversationDatabasePath?: string;
+  runtimeIdentity?: RuntimeIdentity;
+  runtimeCapabilities?: RuntimeCapabilities;
+  hasStreaming?: boolean;
+  contextWindow?: number;
 }
 
 export class ChatService {
@@ -63,6 +72,10 @@ export class ChatService {
   private readonly conversationStore: ConversationStore;
   private readonly cognitiveAdapter: CognitiveAdapter;
   private lastEmotionTimestamp: number;
+  private readonly runtimeIdentity: RuntimeIdentity;
+  private readonly runtimeCapabilities: RuntimeCapabilities;
+  private readonly contextWindow: number;
+  private readonly capabilityRecall: CapabilityRecall;
 
   constructor(
     private readonly repository: MemoryRepository,
@@ -110,13 +123,100 @@ export class ChatService {
       this.entityRepository,
     );
 
-    this.conversationContext = new ConversationContext();
+    this.conversationContext = new ConversationContext(options.contextWindow ?? 20);
+    this.contextWindow = options.contextWindow ?? 20;
     this.conversationStore = new ConversationStore(
       options.conversationDatabasePath ?? "./apps/chat/data/conversations.sqlite",
     );
     this.conversationStore.createConversation({ id: this.conversationId });
 
     this.cognitiveAdapter = new CognitiveAdapter();
+
+    this.runtimeIdentity = options.runtimeIdentity ?? {
+      baseModel: "unknown",
+      adapterName: "none",
+      adapterVersion: "unknown",
+      adapterPath: "none",
+      inferenceBackend: "arcon-lora",
+      adapterActive: false,
+      loadedAt: "",
+      gpuMemoryAllocatedMB: 0,
+      gpuMemoryReservedMB: 0,
+    };
+
+    this.runtimeCapabilities =
+      options.runtimeCapabilities ??
+      buildRuntimeCapabilities({
+        identity: this.runtimeIdentity,
+        hasPersistentMemory: true,
+        hasConversationPersistence: true,
+        hasVoice: false,
+        hasWebAccess: false,
+        hasComputerControl: false,
+        hasBackgroundProcessing: false,
+        hasVectorSearch: false,
+         hasToolCalling: false,
+         hasStreaming: options.hasStreaming ?? false,
+       });
+
+    this.capabilityRecall = createCapabilityRecall({
+      version: "0.2.0",
+      generatedAt: new Date().toISOString(),
+      identity: this.runtimeIdentity,
+      capabilities: this.runtimeCapabilities,
+      status: this.runtimeIdentity.adapterActive ? "ready" : "degraded",
+    });
+
+    this.reconstructContext();
+  }
+
+  private reconstructContext(): void {
+    const messages = this.conversationStore.getRecentMessages(
+      this.conversationId,
+      this.contextWindow,
+    );
+
+    if (messages.length === 0) {
+      return;
+    }
+
+    const sources = messages.map((m) => ({
+      role: m.role as "user" | "assistant" | "system",
+      content: m.content,
+      createdAt: m.createdAt,
+    }));
+
+    this.conversationContext.loadFromMessages(this.conversationId, sources);
+  }
+
+  private tryCapabilityRecall(message: string, intent: string): ChatResult | null {
+    const result = this.capabilityRecall.handleMessage(message);
+
+    if (result.reply === null || result.confidence < 0.8) {
+      return null;
+    }
+
+    const reply = result.reply;
+
+    this.conversationContext.addAssistantMessage(this.conversationId, reply);
+    this.conversationStore.storeMessage({
+      conversationId: this.conversationId,
+      role: "assistant",
+      content: reply,
+    });
+
+    this.processAssistantResponse(
+      reply,
+      "recall",
+      intent,
+      this.interestEngine.getTopArconInterests(),
+    );
+
+    return {
+      prompt: `Capability recall (confidence: ${result.confidence}): ${reply}`,
+      reply,
+      pendingConfirmations: [],
+    };
   }
 
   private processAssistantResponse(
@@ -213,6 +313,11 @@ export class ChatService {
 
     const intent = classifyIntent(message);
 
+    const capabilityHit = this.tryCapabilityRecall(message, intent);
+    if (capabilityHit) {
+      return capabilityHit;
+    }
+
     const activeEntity = this.conversationTracker.getActiveEntity();
 
     const resolvedMessage = message;
@@ -322,18 +427,14 @@ export class ChatService {
 
     if (cognitiveResult.clarificationNeeded) {
       const clarificationPrompt = new PromptBuilder().build({
-        systemPrompt: [
-          systemPrompt,
-          "",
-          "RUNTIME CAPABILITIES:",
-          "Arcon is running locally with SQLite-backed persistent memory, emotion, interest, and conversation storage.",
-          "Arcon does not have web search, file system access, or external tool execution in this runtime.",
-        ].join("\n"),
+        systemPrompt,
         context,
         snapshot,
         cognitiveDecision: cognitiveResult,
         conversationHistory: conversationHistory.slice(-context.maxConversationTurns),
         userMessage: resolvedMessage,
+        runtimeIdentity: this.runtimeIdentity,
+        capabilities: this.runtimeCapabilities,
         strategy: {
           responseStrategy: cognitiveResult.strategy,
           reason: cognitiveResult.strategyReason,
@@ -373,21 +474,15 @@ export class ChatService {
       };
     }
 
-    const runtimeIdentityPrompt = [
-      systemPrompt,
-      "",
-      "RUNTIME CAPABILITIES:",
-      "Arcon is running locally with SQLite-backed persistent memory, emotion, interest, and conversation storage.",
-      "Arcon does not have web search, file system access, or external tool execution in this runtime.",
-    ].join("\n");
-
     const prompt = new PromptBuilder().build({
-      systemPrompt: runtimeIdentityPrompt,
+      systemPrompt,
       context,
       snapshot,
       cognitiveDecision: cognitiveResult,
       conversationHistory: conversationHistory.slice(-context.maxConversationTurns),
       userMessage: resolvedMessage,
+      runtimeIdentity: this.runtimeIdentity,
+      capabilities: this.runtimeCapabilities,
       strategy: {
         responseStrategy: cognitiveResult.strategy,
         reason: cognitiveResult.strategyReason,
@@ -459,6 +554,15 @@ export class ChatService {
 
     const intent = classifyIntent(message);
 
+    const capabilityHit = this.tryCapabilityRecall(message, intent);
+    if (capabilityHit) {
+      yield capabilityHit.reply;
+      return {
+        prompt: capabilityHit.prompt,
+        reply: capabilityHit.reply,
+      };
+    }
+
     const activeEntity = this.conversationTracker.getActiveEntity();
 
     const resolvedMessage = message;
@@ -568,18 +672,14 @@ export class ChatService {
 
     if (cognitiveResult.clarificationNeeded) {
       const clarificationPrompt = new PromptBuilder().build({
-        systemPrompt: [
-          systemPrompt,
-          "",
-          "RUNTIME CAPABILITIES:",
-          "Arcon is running locally with SQLite-backed persistent memory, emotion, interest, and conversation storage.",
-          "Arcon does not have web search, file system access, or external tool execution in this runtime.",
-        ].join("\n"),
+        systemPrompt,
         context,
         snapshot,
         cognitiveDecision: cognitiveResult,
         conversationHistory: conversationHistory.slice(-context.maxConversationTurns),
         userMessage: resolvedMessage,
+        runtimeIdentity: this.runtimeIdentity,
+        capabilities: this.runtimeCapabilities,
         strategy: {
           responseStrategy: cognitiveResult.strategy,
           reason: cognitiveResult.strategyReason,
@@ -606,27 +706,22 @@ export class ChatService {
         arconInterests,
       );
 
+      yield reply;
       return {
         prompt: clarificationPrompt,
         reply,
       };
     }
 
-    const runtimeIdentityPrompt = [
-      systemPrompt,
-      "",
-      "RUNTIME CAPABILITIES:",
-      "Arcon is running locally with SQLite-backed persistent memory, emotion, interest, and conversation storage.",
-      "Arcon does not have web search, file system access, or external tool execution in this runtime.",
-    ].join("\n");
-
     const prompt = new PromptBuilder().build({
-      systemPrompt: runtimeIdentityPrompt,
+      systemPrompt,
       context,
       snapshot,
       cognitiveDecision: cognitiveResult,
       conversationHistory: conversationHistory.slice(-context.maxConversationTurns),
       userMessage: resolvedMessage,
+      runtimeIdentity: this.runtimeIdentity,
+      capabilities: this.runtimeCapabilities,
       strategy: {
         responseStrategy: cognitiveResult.strategy,
         reason: cognitiveResult.strategyReason,

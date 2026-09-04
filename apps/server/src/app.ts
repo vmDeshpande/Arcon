@@ -10,7 +10,7 @@ import {
   type ChatResponse,
   type ConversationMemory
 } from "@arcon/shared";
-import { ChatService, type ChatServiceOptions, type RuntimeIdentity } from "@arcon/ai";
+import { ChatService, type ChatServiceOptions, type RuntimeIdentity, type RuntimeCapabilities } from "@arcon/ai";
 import { MemoryRepository, MemoryPipeline } from "@arcon/memory";
 
 export interface CreateAppOptions {
@@ -23,6 +23,7 @@ export interface CreateAppOptions {
   arconInferenceBaseUrl?: string;
   arconAdapterName?: string;
   runtimeIdentity: RuntimeIdentity;
+  runtimeCapabilities: RuntimeCapabilities;
   chatServiceOptions?: ChatServiceOptions;
   memoryDatabasePath?: string;
 }
@@ -56,6 +57,7 @@ export function createApp(options: CreateAppOptions) {
           inferenceBackend: options.inferenceBackend,
           model: info,
           runtimeIdentity: options.runtimeIdentity,
+          runtimeCapabilities: options.runtimeCapabilities,
         });
       } else {
         response.json({
@@ -68,6 +70,7 @@ export function createApp(options: CreateAppOptions) {
             inference_backend: "Ollama",
           },
           runtimeIdentity: options.runtimeIdentity,
+          runtimeCapabilities: options.runtimeCapabilities,
         });
       }
     } catch (error) {
@@ -84,14 +87,21 @@ export function createApp(options: CreateAppOptions) {
 
   const chatServices = new Map<string, ChatService>();
 
-  function getChatService(conversationId: string): ChatService {
+   function getChatService(conversationId: string): ChatService {
     let service = chatServices.get(conversationId);
     if (!service) {
+      const baseOptions: ChatServiceOptions = {
+        ...options.chatServiceOptions,
+        runtimeIdentity: options.runtimeIdentity,
+        runtimeCapabilities: options.runtimeCapabilities,
+        hasStreaming: true,
+      };
+
       service = new ChatService(
         repository,
         pipeline,
         options.aiClient,
-        options.chatServiceOptions,
+        baseOptions,
         conversationId,
       );
       chatServices.set(conversationId, service);

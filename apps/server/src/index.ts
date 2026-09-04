@@ -1,7 +1,7 @@
 import { config as loadEnv } from "dotenv";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createOllamaClient, createArconLoRAProvider, type ArconLoRAProviderOptions, type OllamaClientOptions, type RuntimeIdentity, DEFAULT_RUNTIME_IDENTITY } from "@arcon/ai";
+import { createOllamaClient, createArconLoRAProvider, type ArconLoRAProviderOptions, type OllamaClientOptions, type RuntimeIdentity, type RuntimeCapabilities, DEFAULT_RUNTIME_IDENTITY, buildRuntimeCapabilities } from "@arcon/ai";
 import { createLogger } from "@arcon/logger";
 import { createConversationMemory, MemoryRepository, MemoryPipeline } from "@arcon/memory";
 import { EventBus } from "@arcon/shared";
@@ -56,6 +56,19 @@ let runtimeIdentity: RuntimeIdentity;
   };
 }
 
+const runtimeCapabilities = buildRuntimeCapabilities({
+  identity: runtimeIdentity,
+  hasPersistentMemory: true,
+  hasConversationPersistence: true,
+  hasVoice: false,
+  hasWebAccess: false,
+  hasComputerControl: false,
+  hasBackgroundProcessing: false,
+  hasVectorSearch: false,
+  hasToolCalling: false,
+  hasStreaming: runtimeIdentity.inferenceBackend === "arcon-lora",
+});
+
 registerEventLogging(eventBus, logger);
 
 const memoriesDir = dirname(config.memoryDatabasePath);
@@ -70,6 +83,7 @@ const app = createApp({
   arconInferenceBaseUrl: config.arconInferenceBaseUrl,
   arconAdapterName: config.arconAdapterName,
   runtimeIdentity,
+  runtimeCapabilities,
   chatServiceOptions: {
     experienceDatabasePath: resolve(memoriesDir, "..", "experiences.sqlite"),
     moodDatabasePath: resolve(memoriesDir, "..", "mood.sqlite"),
@@ -86,6 +100,7 @@ app.listen(config.port, () => {
     adapterName: runtimeIdentity.adapterName,
     adapterActive: runtimeIdentity.adapterActive,
     baseModel: runtimeIdentity.baseModel,
+    runtimeStatus: runtimeIdentity.adapterActive ? "ready" : "degraded",
     ...(config.inferenceBackend === "ollama"
       ? { ollamaBaseUrl: config.ollamaBaseUrl, ollamaModel: config.ollamaModel }
       : { arconInferenceBaseUrl: config.arconInferenceBaseUrl, arconAdapterName: config.arconAdapterName }),

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createApp } from "../src/app.js";
 import { EventBus } from "@arcon/shared";
 import { createConversationMemory } from "@arcon/memory";
+import { DEFAULT_RUNTIME_IDENTITY, DEFAULT_CAPABILITIES } from "@arcon/ai";
 
 class FakeAiClient {
   async generateReply(messages: Array<{ role: string; content: string }>): Promise<string> {
@@ -29,6 +30,8 @@ function createTestApp() {
     ollamaModel: "llama3.2",
     arconInferenceBaseUrl: "http://127.0.0.1:9999",
     arconAdapterName: "arcon-v1",
+    runtimeIdentity: DEFAULT_RUNTIME_IDENTITY,
+    runtimeCapabilities: DEFAULT_CAPABILITIES,
   });
 
   return { app };
@@ -75,6 +78,8 @@ describe("Server integration", () => {
       ollamaModel: "llama3.2",
       arconInferenceBaseUrl: "http://127.0.0.1:9999",
       arconAdapterName: "arcon-v1",
+      runtimeIdentity: DEFAULT_RUNTIME_IDENTITY,
+      runtimeCapabilities: DEFAULT_CAPABILITIES,
     });
 
     const { statusCode, body } = await request(app, "/model-info");
