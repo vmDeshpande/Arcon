@@ -9,6 +9,11 @@
 - `MemoryPipeline.confirmPendingMemory`, `rejectPendingMemory`, `markMemoryContradicted`, `resolveContradiction` methods
 - `MemoryRepository.confirmPendingMemory`, `rejectPendingMemory`, `resolveContradiction`, `getMutations` methods
 - entity-name-aware general memory filtering to prevent unrelated entity leakage during retrieval
+- **Tool integration system**: `ToolRegistry`, `ToolExecutor`, `parseToolCall`, `executeToolLoop`; 5 tools (get_current_time, get_system_status, list_directory, read_file, search_files); strict input validation; case-insensitive tool lookup; structured error codes (NOT_FOUND, VALIDATION_ERROR, TIMEOUT, EXECUTION_ERROR); tool loop telemetry
+- `tools` and `tool_choice` support in inference service chat completions
+- Tool results included in `/chat` API responses
+- `toolResults` field in `ChatResponse` and server chat endpoint
+- Runtime diagnostics logging for tool loop metrics (calls made, results, latency)
 
 ### Changed
 - retrieval ranking formula: relevance now dominates over generic importance/confidence (irrelevance penalty of -1000 for zero keyword matches)
@@ -22,9 +27,10 @@
 - PROJECT scope memories correctly isolated by scope during retrieval
 
 ### Testing
-- 288 tests passing across 32 test files
+- 543 tests passing across 10 test suites in 8 workspaces
 - 0 failures
 - all 8 workspaces build successfully
+- Runtime integration tests (295 in @arcon/ai, 172 in @arcon/memory, 40 in @arcon/personality, 33 in @arcon/voice, 3 in @arcon/server)
 
 ### Conversation Readiness Validation
 - Added end-to-end conversation test suite (`conversation-e2e.test.ts`) covering basic memory lifecycle, memory rejection, supersession/contradiction, project isolation, mood tracking, and full integration

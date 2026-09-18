@@ -6,7 +6,7 @@ The canonical runtime is `apps/server` (Express + `ChatService`). Dead/orphaned 
 
 ## Inference
 
-The active inference path is the Python FastAPI service (`services/arcon-inference/`) serving Qwen/Qwen3-4B + Arcon V1 LoRA adapter. The Node.js runtime connects via `ARCON_INFERENCE_BASE_URL`. `OllamaClient` is preserved for compatibility but is not the active production path.
+The active inference path is the Python FastAPI service (`services/arcon-inference/`) serving Qwen/Qwen3-4B + Arcon V1 LoRA adapter. The Node.js runtime connects via `ARCON_INFERENCE_BASE_URL`. `OllamaClient` is preserved for compatibility but is not the active production path. The inference service accepts `tools` and `tool_choice` in chat completion requests and returns detected tool calls in the response for structured execution by the Node.js runtime.
 
 ## Storage
 

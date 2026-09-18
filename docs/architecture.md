@@ -65,8 +65,8 @@ Arcon is a local-first persistent AI companion built on Qwen3-4B + Arcon V1 LoRA
 
 | Package | Responsibility |
 |---------|---------------|
-| `@arcon/server` | Express server, HTTP endpoints, chat orchestration |
-| `@arcon/ai` | ChatService, cognitive core, prompt building, inference provider |
+| `@arcon/server` | Express server, HTTP endpoints, chat orchestration, tool registration |
+| `@arcon/ai` | ChatService, cognitive core, prompt building, inference provider, tool execution |
 | `@arcon/memory` | SQLite repositories, memory pipeline, retrieval, reflection |
 | `@arcon/personality` | Identity, emotions, mood, interests, experiences |
 | `@arcon/cognition` | Reasoning engine, intent plugins, strategy plugins |
@@ -74,7 +74,40 @@ Arcon is a local-first persistent AI companion built on Qwen3-4B + Arcon V1 LoRA
 | `@arcon/logger` | Structured runtime logging |
 | `@arcon/voice` | Voice interface layer (STT/TTS) |
 
+## Tool Execution
+
+When a `ToolExecutor` is configured on `ChatService`, the model can invoke registered tools to augment its responses. The tool loop follows the pattern:
+
+```
+user message → ChatService → cognitive processing → prompt building →
+model decision → tool-call detection (parseToolCall) → input validation →
+tool execution (ToolExecutor) → tool result in context → model continuation → final answer
+```
+
+Registered tools (via `ToolRegistry`):
+- `get_current_time` — returns the current time
+- `get_system_status` — returns runtime/system metrics
+- `list_directory` — lists directory contents within allowed roots
+- `read_file` — reads file contents within allowed roots
+- `search_files` — searches files by name and content
+
+Tool call parsing supports `tool`, `toolName`, `tool_name`, and `function_call` field names with case-insensitive lookup. Invalid JSON, missing fields, wrong types, unknown tools, and validation failures all produce structured `ToolResult` objects with appropriate error codes (`NOT_FOUND`, `VALIDATION_ERROR`, `TIMEOUT`, `EXECUTION_ERROR`) rather than crashing.
+
 ## Cognitive Layer
+
+The cognitive layer sits between user input and model generation. It:
+
+1. Understands the user's question (intent classification)
+2. Determines which context sources are relevant
+3. Retrieves and ranks candidate context (status + scope + relevance filtering)
+4. Produces a structured `CognitiveDecision`
+5. Selects only relevant information
+6. Prepares the final prompt for the model
+7. If a `ToolExecutor` is configured, runs the tool execution loop after model response
+
+The model remains responsible for natural-language understanding, reasoning, and response generation. The runtime never returns raw context as a conversational answer.
+
+## Tool Execution
 
 The cognitive layer sits between user input and model generation. It:
 

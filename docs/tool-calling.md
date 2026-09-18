@@ -2,7 +2,7 @@
 
 ## Overview
 
-Arcon supports tool-augmented conversations where the model can decide to invoke registered tools (e.g., `get_current_time`, `get_runtime_info`, `list_directory`, `read_file`, `search_files`) and use their results to produce a final answer.
+Arcon supports tool-augmented conversations where the model can decide to invoke registered tools (`get_current_time`, `get_system_status`, `list_directory`, `read_file`, `search_files`) and use their results to produce a final answer.
 
 ## How the Model Selects Tools
 
@@ -28,11 +28,14 @@ The model must output a valid JSON object with:
 | Field        | Type                 | Required | Description                                   |
 |--------------|----------------------|----------|-----------------------------------------------|
 | `tool`       | string               | Yes      | Exact name of a registered tool               |
+| `toolName`   | string               | Optional | Alternative to `tool`                         |
+| `tool_name`  | string               | Optional | Alternative to `tool`                         |
+| `function_call` | object            | Optional | Alternative with `name` and `arguments` fields |
 | `arguments`  | object               | Yes      | Parameter object matching the tool's schema   |
 
-Alternative field name `toolName` is also accepted for `tool`.
+Alternative field names (`toolName`, `tool_name`, `function_call`) are all accepted for `tool`. Lookup is case-insensitive.
 
-Malformed output (invalid JSON, missing fields, wrong types) is treated as a final answer and returned verbatim to the user.
+Malformed output (invalid JSON, missing fields, wrong types, null bytes) is treated as a final answer and returned verbatim to the user.
 
 ## Execution Loop
 
@@ -92,14 +95,15 @@ All failure modes produce structured `ToolResult` objects with `success: false`,
 | `EXECUTION_ERROR` | Tool threw an exception                       |
 
 Error messages never expose stack traces or filesystem details.
-
 ## Streaming Behavior
 
-`chatStream()` preserves streaming as before:
-1. Model response chunks are streamed to the caller as they arrive.
-2. After streaming completes, tool call processing happens (sequential execution).
-3. The async generator does not complete until all tool calls and their results are finished.
-4. Memory extraction and commit still happen after all tool processing is done.
+`chatStream()` handles streaming and tool execution as follows:
+
+1. If the AI client supports `generateReplyStream` (e.g., Ollama), response chunks are streamed to the caller as they arrive.
+2. If streaming is not available (e.g., `ArconLoRAProvider`), the full model response is fetched non-streaming and yielded at once.
+3. After the response is received, if a `ToolExecutor` is configured, `runToolLoop` executes (non-streaming, sequential).
+4. The async generator does not complete until all tool calls and their results are finished.
+5. Memory extraction and commit still happen after all tool processing is done.
 
 ## Registering Tools
 
@@ -144,14 +148,14 @@ The `runtime-integration.test.ts` test suite exercises the actual end-to-end pat
 ### Running runtime tests (requires inference service):
 
 ```bash
-npx tsx --test tests/runtime-integration.test.ts
 npx tsx --test tests/runtime-verification.test.ts
+npx tsx --test tests/runtime-integration.test.ts
 npx tsx --test tests/runtime-real.test.ts
 ```
 
 ## Real Runtime Verification (Live Inference)
 
-The `runtime-real.test.ts` suite verifies the tool layer against the live inference service (Qwen3-4B + Arcon v1 LoRA at `localhost:8000`).
+The `runtime-verification.test.ts` and `runtime-integration.test.ts` suites verify the tool layer against the live inference service (Qwen/Qwen3-4B + arcon-v1 LoRA at `localhost:8000`). The `runtime-real.test.ts` suite tests with the real model.
 
 ### Actual Latency Measurements (RTX 3050 6GB)
 
@@ -159,16 +163,18 @@ The `runtime-real.test.ts` suite verifies the tool layer against the live infere
 |-----------|-----------------|
 | Health check | ~65ms |
 | Model info | ~7ms |
-| Simple inference (`generateReply`) | ~3000ms |
-| Full response (no tool, cognitive pipeline included) | ~4500ms |
-| Tool flow (model response + executeToolLoop, cognitive pipeline included) | ~7200ms |
+| Simple inference (`generateReply`) | ~2000-10000ms (varies by prompt) |
+| Full response (no tool, cognitive pipeline included) | ~4500-15000ms |
+| Tool flow (model response + executeToolLoop, cognitive pipeline included) | ~10000-165000ms (model-dependent) |
 | Tool execution (e.g., get_current_time) | ~20ms |
 | Safety check (path traversal validation) | <1ms |
 | Unknown tool rejection | <1ms |
 
+**Note**: On RTX 3050 6GB with 4-bit quantized Qwen3-4B, inference latency is highly variable (2-165 seconds per response). Tool loop overhead is negligible compared to model inference time. The model may choose not to call tools for some prompts, returning a direct text response instead. This is expected behavior.
+
 ### Observed Behavior
 
-When asked "What time is it?", Qwen3-4B responded with a text answer ("I don't have a clock in my current runtime") rather than calling `get_current_time`. This is a known model behavior — the model sometimes answers directly without invoking tools, even when tools are available. The system handles this gracefully by treating the text response as a final answer.
+When asked "What time is it?", Qwen3-4B sometimes responds with a text answer ("I don't have a clock in my current runtime") rather than calling `get_current_time`. This is a known model behavior — the model sometimes answers directly without invoking tools, even when tools are available. The system handles this gracefully by treating the text response as a final answer.
 
 All runtime verification tests pass:
 
@@ -185,12 +191,11 @@ All runtime verification tests pass:
 
 ## Known Limitations (Qwen3-4B)
 
-1. **Response latency**: ~4-5 seconds for simple responses on RTX 3050 6GB (4-bit quantized). Complex prompts take longer.
+1. **Response latency**: ~4-165 seconds for responses on RTX 3050 6GB (4-bit quantized). Highly variable depending on prompt complexity and model generation length.
 2. **Tool call format sensitivity**: Qwen3-4B may not always output tool calls in the expected JSON-in-markdown format. It may:
    - Answer directly without calling tools (e.g., "I don't have a clock" instead of calling get_current_time)
    - Output tool calls without markdown code blocks
    - Include extra text around the tool call JSON
-   - Use single quotes or trailing commas (rejected safely as final reply)
 3. **Tool choice**: The model decides whether to call tools based on its own judgment. Direct answers may be preferred for some questions.
 4. **Iteration limit**: Default max 5 iterations. Complex tasks requiring many tools may hit the limit.
 5. **No streaming tool calls**: Tool execution happens after the streaming response completes.

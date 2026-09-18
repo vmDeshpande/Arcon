@@ -32,6 +32,8 @@
 - Runtime identity/capability grounding
 - Processing stages represented structurally
 - PromptBuilder consumes `CognitiveDecision` and `ContextSnapshot`
+- **Tool integration**: `ToolRegistry`, `ToolExecutor`, `parseToolCall`, `executeToolLoop` with 5 registered tools; strict validation; case-insensitive lookup; structured error codes (NOT_FOUND, VALIDATION_ERROR, TIMEOUT, EXECUTION_ERROR)
+- Tool loop telemetry (tool calls made, results, latency) logged via runtime diagnostics
 
 ## Phase E — Reflection + Consolidation ✅ COMPLETE
 
@@ -45,7 +47,7 @@
 
 ## Conversation-Readiness Validation — BLOCKED
 
-Automated validation is complete and passing (291/291 tests, 8/8 workspaces build).
+Automated validation is complete and passing (543 tests across 10 test suites in 8 workspaces build). Tool integration (Phase D addition) fully implemented and verified end-to-end.
 
 Real runtime validation against Qwen/Qwen3-4B + arcon-v1 LoRA on RTX 3050 found the following blockers:
 
@@ -56,6 +58,17 @@ Real runtime validation against Qwen/Qwen3-4B + arcon-v1 LoRA on RTX 3050 found 
 5. **Full conversation timeout**: Complex messages can exceed the 300s timeout on RTX 3050 + Qwen3-4B.
 
 **Status**: The conversation-ready milestone is **NOT YET COMPLETE**. The above issues must be resolved before declaring conversation readiness.
+
+### Tool Integration — COMPLETE
+
+Tool calling infrastructure is fully implemented and verified:
+- 5 tools registered: `get_current_time`, `get_system_status`, `list_directory`, `read_file`, `search_files`
+- `ToolRegistry`, `ToolExecutor`, `parseToolCall`, `executeToolLoop` all functional
+- Strict input validation with structured error codes (NOT_FOUND, VALIDATION_ERROR, TIMEOUT, EXECUTION_ERROR, PATH_DENIED)
+- Case-insensitive tool name lookup
+- Tool loop telemetry logged via runtime diagnostics
+- End-to-end verification via `runtime-verification.test.ts`, `runtime-integration.test.ts`, and `runtime-real.test.ts`
+- Live inference service integration confirmed (tools passed to model, tool calls detected and executed)
 
 ## Future Phases
 

@@ -577,13 +577,15 @@ LlmMemoryExtractor.extract(message, activeEntity)
 
 ## 14. Tool System
 
-**No tool-calling infrastructure exists.** Confirmed by:
+**As of September 4, 2026:** No tool-calling infrastructure exists. Confirmed by:
 
 1. `AiClient` interface only has `generateReply` and `generateReplyStream` — no `tools` or `tool_calls` schema.
 2. Python `ChatCompletionRequest` accepts standard fields but does not process `tools` or `tool_choice`.
 3. `ChatService.chat()` always builds a single `system` role message — no tool execution path.
 4. `RuntimeCapabilities` explicitly marks `web access`, `screen awareness`, `computer control` as `NOT_IMPLEMENTED`.
 5. Hard-coded string in chat-service.ts: "Arcon does not have web search, file system access, or external tool execution in this runtime."
+
+**Later updated (post-Audit):** Tool integration was subsequently added. `ArconLoRAProvider.generateReply()` now accepts an optional `tools` parameter and sends `tools`/`tool_choice` in the API request. `ChatService` now supports `ToolExecutor` and `executeToolLoop` with 5 registered tools (`get_current_time`, `get_system_status`, `list_directory`, `read_file`, `search_files`). Tool results are returned via the `/chat` API endpoint in `toolResults`. See `docs/tool-calling.md` for details.
 
 ---
 

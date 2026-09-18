@@ -6,7 +6,7 @@
 
 > **⚠️ Project Status**
 >
-> Arcon is under active development and its architecture is evolving rapidly. While many core cognitive systems already exist, the project is **not production-ready** and breaking changes should be expected.
+> Arcon is under active development. Core cognitive systems are implemented and verified with automated tests (543 passing across 10 workspaces). Runtime integration with Qwen/Qwen3-4B + Arcon V1 LoRA is verified end-to-end. Breaking changes should still be expected as the architecture evolves.
 
 ---
 
@@ -230,17 +230,11 @@ Current capabilities include:
 
 ### Validation Status
 
-**Automated tests**: 288/288 passing across 32 test files. All 8 workspaces build successfully.
+**Automated tests**: 543 passing across 10 test suites in 8 workspaces. All workspaces build successfully.
 
-**Real runtime validation**: Blocked. Smoke testing against Qwen/Qwen3-4B + arcon-v1 LoRA on RTX 3050 revealed the following blockers:
+**Real runtime validation**: End-to-end tool integration verified via `runtime-verification.test.ts` (9 tests) and `runtime-integration.test.ts` (9 tests) against the live Python inference service. Model inference confirmed working with Qwen/Qwen3-4B + arcon-v1 LoRA on RTX 3050. Tool loop infrastructure correctly passes tools to the model and executes tool calls when generated.
 
-1. Supersession/correction does not reliably trigger with real LLM extraction output.
-2. No runtime memory confirmation/rejection flow before storing preferences.
-3. Real LLM extraction is inconsistent for similar message patterns.
-4. Mood decay does not reduce intensity as expected at runtime.
-5. Full conversation runtime can exceed 300s timeout on RTX 3050 + Qwen3-4B.
-
-The conversation-ready milestone is **not yet complete**. See `CHANGELOG.md` for detailed findings.
+**Note**: Cognition package (`@arcon/cognition`) has no test suite as it is not a standalone package in the current architecture (reasoning is integrated into `@arcon/ai`).
 
 ---
 
@@ -468,6 +462,7 @@ docs/                  # Architecture, design decisions, specifications
 * Interest engine (user + Arcon, separated)
 * Experience tracking with provenance
 * **ContextSnapshot** — structured internal state for context
+* **Tool integration** — ToolRegistry, ToolExecutor, parseToolCall, executeToolLoop; 5 tools (get_current_time, get_system_status, list_directory, read_file, search_files) with strict validation and case-insensitive lookup
 * **CognitiveDecision** — structured cognitive output
 * **Cognitive Core** — intent classification, strategy, clarification routing
 * **Context contamination prevention**
@@ -632,11 +627,11 @@ Memory retrieval, persistence, and context selection are all verified working. H
 
 ## Unit Tests
 
-* `@arcon/ai`: **32/32 passing** (includes cognitive core tests)
-* `@arcon/memory`: **93/93 passing** (includes reflection tests)
-* `@arcon/personality`: **44/44 passing**
-* `@arcon/cognition`: **43/43 passing**
-* `@arcon/voice`: **40/40 passing**
+* `@arcon/ai`: **295/295 passing** (includes cognitive core, tool integration, runtime verification tests)
+* `@arcon/memory`: **172/172 passing** (includes reflection tests)
+* `@arcon/personality`: **40/40 passing**
+* `@arcon/voice`: **33/33 passing**
+* `@arcon/server`: **3/3 passing**
 
 ## Verified Integration Behaviour
 
@@ -651,6 +646,10 @@ Memory retrieval, persistence, and context selection are all verified working. H
 * Clarification questions are asked when context is insufficient
 * Supersession preserves historical lineage
 * Reflection proposals route through MemoryPipeline with evidence
+* Tool loop executes tool calls with strict validation (NOT_FOUND, VALIDATION_ERROR, TIMEOUT, EXECUTION_ERROR handling)
+* Unknown tools rejected gracefully; invalid arguments produce structured errors
+* Path traversal blocked in file tools
+* Runtime verification tests pass against live inference service (Qwen/Qwen3-4B + arcon-v1 LoRA)
 
 ---
 

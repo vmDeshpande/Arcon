@@ -2,7 +2,9 @@
 
 ## Overview
 
-Arcon uses a verified local integration layer where the Qwen3-4B model invokes registered tools to augment its responses. The flow is:
+Arcon uses a verified local integration layer where the Qwen3-4B model invokes registered tools to augment its responses. Registered tools: `get_current_time`, `get_system_status`, `list_directory`, `read_file`, `search_files`.
+
+The flow is:
 
 ```
 user message → ChatService → cognitive processing → prompt building →
@@ -43,7 +45,8 @@ tool result in context → model continuation → final answer
 
 ### Tool-Call Parser
 - Extracts JSON from markdown code blocks in model output
-- Supports both `tool` and `toolName` field names
+- Supports `tool`, `toolName`, `tool_name`, and `function_call` field names
+- Case-insensitive tool name lookup
 - Returns `finalReply` for non-tool responses (no throw)
 
 ### Prompt Builder
@@ -62,6 +65,9 @@ npx tsx --test tests/runtime-integration.test.ts
 
 # Runtime verification tests (requires inference service running)
 npx tsx --test tests/runtime-verification.test.ts
+
+# Real runtime tests (requires inference service running, tests against live model)
+npx tsx --test tests/runtime-real.test.ts
 
 # Tool unit tests
 npx tsx --test tests/tools/*.test.ts
@@ -83,7 +89,7 @@ Test the full ChatService path with real tools and mocked model responses:
 - Final response incorporates tool result
 
 ### Runtime Verification
-Tests against the live Python inference service (Qwen3-4B + Arcon v1 LoRA):
+Tests against the live Python inference service (Qwen/Qwen3-4B + arcon-v1 LoRA):
 - Provider health check
 - Basic inference (generateReply)
 - Model info and runtime identity
@@ -94,9 +100,9 @@ Tests against the live Python inference service (Qwen3-4B + Arcon v1 LoRA):
 
 **Actual latencies** (RTX 3050 6GB, first inference warm):
 - Health check: ~65ms
-- Simple inference: ~3000ms
-- Full response (no tool): ~4500ms
-- Tool flow (with cognitive pipeline): ~7200ms
+- Simple inference: ~2000-10000ms (highly variable)
+- Full response (no tool): ~4500-15000ms
+- Tool flow (with cognitive pipeline): ~10000-165000ms (model-dependent)
 - Tool execution (e.g., get_current_time): ~20ms
 - Safety validations: <1ms
 
@@ -111,6 +117,7 @@ Run: `npx tsx --test tests/runtime-real.test.ts`
 | Path traversal | PATH_DENIED — no stack trace exposed |
 | Unknown tool | NOT_FOUND — handled gracefully |
 | Tool execution | get_current_time succeeded (~20ms) |
+| Live inference end-to-end | Server returns reply + toolResults structure via /chat endpoint |
 
 ## Known Limitations (Qwen3-4B)
 

@@ -49,6 +49,10 @@ The service listens on `http://127.0.0.1:8000` by default.
 - `GET /health` — Health check
 - `GET /v1/models` — Model metadata including adapter info
 - `POST /v1/chat/completions` — Chat completion (OpenAI-compatible)
+  - Accepts `tools` (array of tool definitions) and `tool_choice` (e.g., `"required"`) in request body
+  - When tools are provided, prepends a system message with tool descriptions and instructions before generation
+  - If the response contains `tool_calls`, the tool call JSON is extracted and returned as a structured tool call response
+  - On non-streaming requests, response includes `choices[].message.tool_calls` when detected
 
 ## Node.js runtime connection
 

@@ -15,6 +15,13 @@ Current architectural phases:
 - Phase D — Cognitive Core (complete)
 - Phase E — Reflection + Consolidation (complete)
 
+Current capabilities:
+- Tool-augmented conversations via ToolRegistry/ToolExecutor
+- 5 registered tools: get_current_time, get_system_status, list_directory, read_file, search_files
+- Strict tool input validation with structured error codes
+- Case-insensitive tool name lookup
+- Tool loop telemetry and diagnostics
+
 ## Development Setup
 
 ### Prerequisites
@@ -40,13 +47,14 @@ npm run build
 
 ```bash
 # Run all tests across workspaces
-npx tsx --test "packages/*/tests/**/*.test.ts" "apps/*/tests/**/*.test.ts"
+npm test
 
 # Or run tests for a specific workspace
-npm test -w @arcon/memory
 npm test -w @arcon/ai
+npm test -w @arcon/memory
 npm test -w @arcon/personality
 npm test -w @arcon/voice
+npm test -w @arcon/server
 ```
 
 ### Run the Project
@@ -77,7 +85,7 @@ apps/
   desktop/          # Desktop UI (out of scope)
 
 packages/
-  ai/               # Chat orchestration, cognitive core, prompt building
+  ai/               # Chat orchestration, cognitive core, prompt building, inference, tool execution
   cognition/        # Reasoning engine, intent plugins, strategy plugins
   logger/           # Structured runtime logging
   memory/           # SQLite repositories, memory pipeline, retrieval, reflection
@@ -86,7 +94,7 @@ packages/
   voice/            # Voice interface layer (STT/TTS)
 
 services/
-  arcon-inference/  # Python FastAPI inference service
+  arcon-inference/  # Python FastAPI inference service (supports tools/tool_choice)
 
 training/           # LoRA/QLoRA training scripts and datasets
 docs/               # Architecture, design decisions, specifications

@@ -11,7 +11,6 @@ Ideas that are important future features but not required for this phase:
 - Screen awareness / computer control
 - External integrations (Slack, email, calendar)
 - Complex planning / multi-step task execution
-- Advanced tool orchestration (function calling with side effects)
 - Proactive behavior (autonomous check-ins, reminders)
 - Database connection pool management (ChatService instances Map has no eviction)
 - ConversationContext persistence (lost on server restart)
